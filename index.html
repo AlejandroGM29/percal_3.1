@@ -1,0 +1,1666 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PERCAL JS</title>
+
+  <link rel="stylesheet" href="./styles.css" />
+
+  <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+</head>
+
+<body>
+  <main class="app">
+    <header class="app-header">
+      <div>
+        <h1>PERCAL JS</h1>
+        <p>Generador de cartas, función múltiple, Penta, Pozo, ZIP y pliegos para imprenta.</p>
+      </div>
+
+      <div class="app-header-meta">
+        <span id="globalStatusBadge" class="badge badge-neutral">Sin generar</span>
+      </div>
+    </header>
+
+    <nav class="tabs" aria-label="Secciones">
+      <button class="tab-button active" data-tab="generation">Generación</button>
+      <button class="tab-button" data-tab="current">Carta actual</button>
+      <button class="tab-button" data-tab="gallery">Galería</button>
+      <button class="tab-button" data-tab="export">Exportación</button>
+      <button class="tab-button" data-tab="sheets">Pliegos</button>
+    </nav>
+
+    <!-- GENERACIÓN -->
+    <section id="tab-generation" class="tab-panel active">
+      <section class="panel">
+        <div class="panel-title-row">
+          <div>
+            <h2>Generación</h2>
+            <p>Configura el modo, cantidad y medidas antes de generar.</p>
+          </div>
+          <span class="badge">Experimental</span>
+        </div>
+
+        <div class="form-grid">
+          <div class="field">
+            <label for="mode">Modo</label>
+            <select id="mode">
+              <option value="basica">Básica</option>
+              <option value="basicaDoble">Básica Doble</option>
+              <option value="basicaDoblePlus">Básica Doble Plus</option>
+              <option value="multiple">Función múltiple</option>
+              <option value="multipleDoble">Función múltiple doble</option>
+              <option value="multipleDoblePlus">Función múltiple doble plus</option>
+              <option value="penta">Penta — 5x5</option>
+              <option value="pozo">Pozo — layout provisional</option>
+            </select>
+          </div>
+
+          <div class="field">
+            <label for="sizeId">Tamaño</label>
+            <select id="sizeId">
+              <option value="1">1 — 212x360 px</option>
+              <option value="2">2 — 272x367 px</option>
+              <option value="3">3 — 316x396 px</option>
+              <option value="4">4 — editable</option>
+              <option value="5">5 — 332x516 px</option>
+              <option value="6">6 — 436x700 px</option>
+            </select>
+          </div>
+
+          <div class="field">
+            <label for="quantity">Cantidad de cartas</label>
+            <input id="quantity" type="number" value="1" min="1" />
+            <small>Aplica a Básica, Básica Doble, Penta y Pozo.</small>
+          </div>
+
+          <div class="field">
+            <label for="seed">Semilla opcional</label>
+            <input id="seed" type="number" placeholder="Ej. 12345" />
+          </div>
+
+          <div class="field">
+            <label for="imageExtension">Extensión</label>
+            <select id="imageExtension">
+              <option value="jpg">.jpg</option>
+              <option value="png">.png</option>
+              <option value="webp">.webp</option>
+            </select>
+          </div>
+
+          <div id="multipleOptions" class="field">
+            <label for="multipleCount">Cartas función múltiple</label>
+            <select id="multipleCount">
+              <option value="4">4 cartas — A/B/C/D</option>
+              <option value="5">5 cartas</option>
+              <option value="6">6 cartas</option>
+              <option value="8">8 cartas</option>
+              <option value="10">10 cartas</option>
+            </select>
+          </div>
+
+          <div class="field">
+            <label for="previewLimit">Límite de galería</label>
+            <input id="previewLimit" type="number" value="40" min="1" />
+            <small>Evita páginas enormes cuando se generan muchas cartas.</small>
+          </div>
+
+          <div class="field checkbox-field">
+            <label>Patrones</label>
+            <label class="check-row">
+              <input id="activeCorners" type="checkbox" />
+              <span>Activar esquinas</span>
+            </label>
+          </div>
+
+          <div class="field checkbox-field">
+            <label>Canvas</label>
+            <label class="check-row">
+              <input id="drawCanvasFrame" type="checkbox" checked />
+              <span>Marco en todos los tamaños</span>
+            </label>
+          </div>
+
+          <div class="field checkbox-field">
+            <label>Cruz</label>
+            <label class="check-row">
+              <input id="drawCross" type="checkbox" />
+              <span>Cruz visual</span>
+            </label>
+          </div>
+        </div>
+
+        <div id="size4Editor" class="subpanel hidden">
+          <h3>Actualizar Tamaño 4</h3>
+
+          <div class="form-grid compact">
+            <div class="field">
+              <label for="size4Width">Ancho</label>
+              <input id="size4Width" type="number" value="302" min="1" />
+            </div>
+
+            <div class="field">
+              <label for="size4Height">Alto</label>
+              <input id="size4Height" type="number" value="454" min="1" />
+            </div>
+
+            <div class="field">
+              <label for="size4Cm">Medida cm</label>
+              <input id="size4Cm" type="text" value="12.0 x 8.0" />
+            </div>
+          </div>
+        </div>
+
+        <div class="actions">
+          <button id="generateBtn">Generar</button>
+          <button id="clearBtn" class="button-secondary">Limpiar</button>
+        </div>
+
+        <div id="status" class="status"></div>
+      </section>
+    </section>
+
+    <!-- CARTA ACTUAL -->
+    <section id="tab-current" class="tab-panel">
+      <section class="panel">
+        <div class="panel-title-row">
+          <div>
+            <h2>Carta actual</h2>
+            <p id="currentSummary">Sin carta seleccionada.</p>
+          </div>
+
+          <div class="counter-box">
+            <span id="currentCounter">0 / 0</span>
+          </div>
+        </div>
+
+        <div class="current-layout">
+          <aside class="current-controls">
+            <button id="photoBtn" disabled>Foto + siguiente</button>
+            <button id="downloadCurrentBtn" class="button-secondary" disabled>Descargar actual</button>
+            <button id="previousBtn" class="button-secondary" disabled>Anterior</button>
+            <button id="nextBtn" class="button-secondary" disabled>Siguiente</button>
+
+            <div class="jump-box">
+              <label for="jumpToCard">Ir a carta</label>
+              <div class="jump-row">
+                <input id="jumpToCard" type="number" min="1" value="1" />
+                <button id="jumpBtn" class="button-secondary" disabled>Ir</button>
+              </div>
+            </div>
+
+            <div class="hint-box">
+              El botón <strong>Foto + siguiente</strong> descarga la carta actual y avanza después de 500 ms.
+            </div>
+          </aside>
+
+          <div id="currentPreview" class="current-preview">
+            <div class="empty-state">Genera cartas para ver la carta actual.</div>
+          </div>
+        </div>
+      </section>
+    </section>
+
+    <!-- GALERÍA -->
+    <section id="tab-gallery" class="tab-panel">
+      <section class="panel">
+        <div class="panel-title-row">
+          <div>
+            <h2>Galería</h2>
+            <p id="summary">Sin cartas generadas.</p>
+          </div>
+
+          <button id="refreshGalleryBtn" class="button-secondary" disabled>Actualizar galería</button>
+        </div>
+
+        <div class="gallery-note">
+          La galería muestra solo el límite configurado. La exportación siempre usa todas las cartas generadas.
+        </div>
+
+        <div id="previewGrid" class="preview-grid"></div>
+      </section>
+    </section>
+
+    <!-- EXPORTACIÓN -->
+    <section id="tab-export" class="tab-panel">
+      <section class="panel">
+        <div class="panel-title-row">
+          <div>
+            <h2>Exportación</h2>
+            <p>Descarga cartas individuales. Si hay varias, se empaquetan en ZIP.</p>
+          </div>
+          <span class="badge">PNG / ZIP</span>
+        </div>
+
+        <div class="form-grid">
+          <div class="field">
+            <label for="zipName">Nombre ZIP</label>
+            <input id="zipName" type="text" placeholder="percal_export.zip" />
+          </div>
+
+          <div class="field">
+            <label for="folderName">Carpeta dentro del ZIP</label>
+            <input id="folderName" type="text" value="percal" />
+          </div>
+        </div>
+
+        <div class="actions">
+          <button id="downloadIndividualBtn" disabled>Descargar cartas</button>
+        </div>
+
+        <div id="exportStatus" class="status"></div>
+      </section>
+    </section>
+
+    <!-- PLIEGOS -->
+    <section id="tab-sheets" class="tab-panel">
+      <section class="panel">
+        <div class="panel-title-row">
+          <div>
+            <h2>Pliegos para imprenta</h2>
+            <p>Acomoda varias cartas en una imagen grande para imprimir y cortar.</p>
+          </div>
+          <span class="badge">Imprenta</span>
+        </div>
+
+        <div class="form-grid">
+          <div class="field">
+            <label for="cardsPerSheet">Cartas por pliego</label>
+            <input id="cardsPerSheet" type="number" value="8" min="1" />
+          </div>
+
+          <div class="field">
+            <label for="columns">Columnas</label>
+            <input id="columns" type="number" value="2" min="1" />
+            <small>Vacío = automático.</small>
+          </div>
+
+          <div class="field">
+            <label for="gap">Separación px</label>
+            <input id="gap" type="number" value="20" min="0" />
+          </div>
+
+          <div class="field">
+            <label for="padding">Margen px</label>
+            <input id="padding" type="number" value="30" min="0" />
+          </div>
+
+          <div class="field">
+            <label for="sheetPreset">Preset</label>
+            <select id="sheetPreset">
+              <option value="">Sin preset</option>
+              <option value="letter-300">Carta 300 DPI — 2550x3300</option>
+              <option value="tabloid-300">Tabloide 300 DPI — 3300x5100</option>
+              <option value="a4-300">A4 300 DPI — 2480x3508</option>
+              <option value="custom">Personalizado</option>
+            </select>
+          </div>
+
+          <div class="field">
+            <label for="sheetWidth">Ancho pliego px</label>
+            <input id="sheetWidth" type="number" placeholder="Auto" min="1" />
+          </div>
+
+          <div class="field">
+            <label for="sheetHeight">Alto pliego px</label>
+            <input id="sheetHeight" type="number" placeholder="Auto" min="1" />
+          </div>
+
+          <div class="field">
+            <label for="cutGuideLength">Largo guía px</label>
+            <input id="cutGuideLength" type="number" value="12" min="1" />
+          </div>
+
+          <div class="field">
+            <label for="cutGuideOffset">Separación guía px</label>
+            <input id="cutGuideOffset" type="number" value="4" min="0" />
+          </div>
+
+          <div class="field checkbox-field">
+            <label>Guías</label>
+            <label class="check-row">
+              <input id="showCutGuides" type="checkbox" checked />
+              <span>Mostrar guías de corte</span>
+            </label>
+          </div>
+        </div>
+
+        <div class="actions">
+          <button id="previewSheetsBtn" disabled>Preview pliegos</button>
+          <button id="downloadSheetsBtn" class="button-secondary" disabled>Descargar pliegos ZIP</button>
+        </div>
+
+        <div id="sheetStatus" class="status"></div>
+      </section>
+
+      <section id="sheetPreviewPanel" class="panel hidden">
+        <div class="panel-title-row">
+          <div>
+            <h2>Preview de pliegos</h2>
+            <p id="sheetSummary">Sin pliegos generados.</p>
+          </div>
+        </div>
+
+        <div id="sheetPreviewGrid" class="sheet-preview-grid"></div>
+      </section>
+    </section>
+  </main>
+
+  <script type="module">
+    import {
+      CARD_SIZES,
+      defaultImageUrl,
+      downloadBlob,
+    } from "./percal-js-core.js";
+
+    const IMAGE_COUNT = 54;
+
+    const DOUBLE_PATTERNS = [
+      [0, 15],
+      [3, 12],
+      [5, 6],
+      [5, 10],
+      [6, 9],
+    ];
+
+    const els = {
+      globalStatusBadge: document.getElementById("globalStatusBadge"),
+
+      mode: document.getElementById("mode"),
+      sizeId: document.getElementById("sizeId"),
+      quantity: document.getElementById("quantity"),
+      seed: document.getElementById("seed"),
+      imageExtension: document.getElementById("imageExtension"),
+      multipleOptions: document.getElementById("multipleOptions"),
+      multipleCount: document.getElementById("multipleCount"),
+      previewLimit: document.getElementById("previewLimit"),
+      activeCorners: document.getElementById("activeCorners"),
+      drawCanvasFrame: document.getElementById("drawCanvasFrame"),
+      drawCross: document.getElementById("drawCross"),
+
+      size4Editor: document.getElementById("size4Editor"),
+      size4Width: document.getElementById("size4Width"),
+      size4Height: document.getElementById("size4Height"),
+      size4Cm: document.getElementById("size4Cm"),
+
+      generateBtn: document.getElementById("generateBtn"),
+      clearBtn: document.getElementById("clearBtn"),
+      status: document.getElementById("status"),
+
+      currentSummary: document.getElementById("currentSummary"),
+      currentCounter: document.getElementById("currentCounter"),
+      currentPreview: document.getElementById("currentPreview"),
+      photoBtn: document.getElementById("photoBtn"),
+      downloadCurrentBtn: document.getElementById("downloadCurrentBtn"),
+      previousBtn: document.getElementById("previousBtn"),
+      nextBtn: document.getElementById("nextBtn"),
+      jumpToCard: document.getElementById("jumpToCard"),
+      jumpBtn: document.getElementById("jumpBtn"),
+
+      summary: document.getElementById("summary"),
+      previewGrid: document.getElementById("previewGrid"),
+      refreshGalleryBtn: document.getElementById("refreshGalleryBtn"),
+
+      zipName: document.getElementById("zipName"),
+      folderName: document.getElementById("folderName"),
+      downloadIndividualBtn: document.getElementById("downloadIndividualBtn"),
+      exportStatus: document.getElementById("exportStatus"),
+
+      cardsPerSheet: document.getElementById("cardsPerSheet"),
+      columns: document.getElementById("columns"),
+      gap: document.getElementById("gap"),
+      padding: document.getElementById("padding"),
+      sheetPreset: document.getElementById("sheetPreset"),
+      sheetWidth: document.getElementById("sheetWidth"),
+      sheetHeight: document.getElementById("sheetHeight"),
+      cutGuideLength: document.getElementById("cutGuideLength"),
+      cutGuideOffset: document.getElementById("cutGuideOffset"),
+      showCutGuides: document.getElementById("showCutGuides"),
+      previewSheetsBtn: document.getElementById("previewSheetsBtn"),
+      downloadSheetsBtn: document.getElementById("downloadSheetsBtn"),
+      sheetStatus: document.getElementById("sheetStatus"),
+      sheetPreviewPanel: document.getElementById("sheetPreviewPanel"),
+      sheetSummary: document.getElementById("sheetSummary"),
+      sheetPreviewGrid: document.getElementById("sheetPreviewGrid"),
+    };
+
+    const state = {
+      result: null,
+      currentIndex: 0,
+      currentCanvas: null,
+      galleryCache: new Map(),
+      currentCache: new Map(),
+      sheetFiles: [],
+    };
+
+    document.querySelectorAll(".tab-button").forEach((button) => {
+      button.addEventListener("click", () => activateTab(button.dataset.tab));
+    });
+
+    els.mode.addEventListener("change", syncModeOptions);
+    els.sizeId.addEventListener("change", syncSizeOptions);
+    els.generateBtn.addEventListener("click", generate);
+    els.clearBtn.addEventListener("click", clearAll);
+
+    els.photoBtn.addEventListener("click", photoAndNext);
+    els.downloadCurrentBtn.addEventListener("click", downloadCurrent);
+    els.previousBtn.addEventListener("click", previousCard);
+    els.nextBtn.addEventListener("click", nextCard);
+    els.jumpBtn.addEventListener("click", jumpToCard);
+
+    els.refreshGalleryBtn.addEventListener("click", renderGallery);
+    els.downloadIndividualBtn.addEventListener("click", downloadIndividualExport);
+
+    els.sheetPreset.addEventListener("change", applySheetPreset);
+    els.previewSheetsBtn.addEventListener("click", previewSheets);
+    els.downloadSheetsBtn.addEventListener("click", downloadSheetsExport);
+
+    syncModeOptions();
+    syncSizeOptions();
+
+    function activateTab(tabName) {
+      document.querySelectorAll(".tab-button").forEach((button) => {
+        button.classList.toggle("active", button.dataset.tab === tabName);
+      });
+
+      document.querySelectorAll(".tab-panel").forEach((panel) => {
+        panel.classList.toggle("active", panel.id === `tab-${tabName}`);
+      });
+    }
+
+    async function generate() {
+      setBusy(true);
+      clearGeneratedOnly();
+
+      try {
+        const options = getGenerationOptions();
+
+        state.result = generatePercalLocal(options);
+        state.currentIndex = 0;
+
+        const total = state.result.cards.length;
+        const size = getSelectedCardSize();
+
+        els.status.textContent = `Generadas ${total} carta(s). Renderizando carta actual...`;
+        els.summary.textContent =
+          `${total} carta(s), ${state.result.label}, tamaño ${size.width}x${size.height}px, semilla ${state.result.seed}.`;
+
+        els.globalStatusBadge.textContent = `${total} carta(s)`;
+        els.globalStatusBadge.className = "badge badge-success";
+
+        enableAfterGenerate(true);
+
+        await renderCurrentCard();
+        await renderGallery();
+
+        els.status.textContent = `Listo. ${total} carta(s) generadas.`;
+        activateTab("current");
+      } catch (error) {
+        console.error(error);
+        els.status.textContent = `Error: ${error.message}`;
+        els.globalStatusBadge.textContent = "Error";
+        els.globalStatusBadge.className = "badge badge-danger";
+      } finally {
+        setBusy(false);
+      }
+    }
+
+    function getGenerationOptions() {
+      const seedValue = els.seed.value.trim();
+
+      return {
+        mode: els.mode.value,
+        sizeId: Number(els.sizeId.value),
+        quantity: Math.max(1, numberOrDefault(els.quantity.value, 1)),
+        seed: seedValue === "" ? undefined : Number(seedValue),
+        activeCorners: els.activeCorners.checked,
+        multipleCount: Number(els.multipleCount.value),
+      };
+    }
+
+    function generatePercalLocal({
+      mode,
+      seed,
+      quantity = 1,
+      activeCorners = false,
+      multipleCount = 4,
+    }) {
+      const rng = makeRng(seed);
+
+      const labels = {
+        basica: "Básica",
+        basicaDoble: "Básica Doble",
+        basicaDoblePlus: "Básica Doble Plus",
+        multiple: "Función múltiple",
+        multipleDoble: "Función múltiple doble",
+        multipleDoblePlus: "Función múltiple doble plus",
+        penta: "Penta",
+        pozo: "Pozo",
+      };
+
+      switch (mode) {
+        case "basica":
+          return {
+            mode,
+            label: `${labels[mode]} — ${quantity} carta(s)`,
+            seed: rng.seed,
+            layout: createGridLayout(4, 4),
+            cards: Array.from({ length: quantity }, () => generateUniqueCard(16, rng)),
+          };
+
+        case "basicaDoble":
+          return {
+            mode,
+            label: `${labels[mode]} — ${quantity} carta(s)`,
+            seed: rng.seed,
+            layout: createGridLayout(4, 4),
+            cards: Array.from({ length: quantity }, () =>
+              generateBasicDoubleCard(rng, activeCorners)
+            ),
+          };
+
+        case "basicaDoblePlus":
+          return {
+            mode,
+            label: labels[mode],
+            seed: rng.seed,
+            layout: createGridLayout(4, 4),
+            cards: range(1, IMAGE_COUNT).map((doubleId) =>
+              generateBasicDoubleCard(rng, activeCorners, doubleId)
+            ),
+          };
+
+        case "multiple":
+          return {
+            mode,
+            label: `${labels[mode]} — ${multipleCount} carta(s)`,
+            seed: rng.seed,
+            layout: createGridLayout(4, 4),
+            cards: generateMultipleGroup({
+              groupSize: multipleCount,
+              rng,
+              doubleMode: false,
+              activeCorners,
+            }),
+          };
+
+        case "multipleDoble":
+          return {
+            mode,
+            label: `${labels[mode]} — ${multipleCount} carta(s)`,
+            seed: rng.seed,
+            layout: createGridLayout(4, 4),
+            cards: generateMultipleGroup({
+              groupSize: multipleCount,
+              rng,
+              doubleMode: true,
+              activeCorners,
+            }),
+          };
+
+        case "multipleDoblePlus":
+          return {
+            mode,
+            label: `${labels[mode]} — grupos de ${multipleCount}`,
+            seed: rng.seed,
+            layout: createGridLayout(4, 4),
+            cards: generateMultipleDoublePlus({
+              groupSize: multipleCount,
+              rng,
+              activeCorners,
+            }),
+          };
+
+        case "penta":
+          return {
+            mode,
+            label: `${labels[mode]} — ${quantity} carta(s)`,
+            seed: rng.seed,
+            layout: createGridLayout(5, 5),
+            cards: Array.from({ length: quantity }, () => generateUniqueCard(25, rng)),
+          };
+
+        case "pozo":
+          return {
+            mode,
+            label: `${labels[mode]} — ${quantity} carta(s)`,
+            seed: rng.seed,
+            layout: createPozoLayout(),
+            cards: Array.from({ length: quantity }, () => generateUniqueCard(17, rng)),
+          };
+
+        default:
+          throw new Error(`Modo no soportado: ${mode}`);
+      }
+    }
+
+    function generateUniqueCard(cellCount, rng) {
+      return shuffle(imageDeck(), rng).slice(0, cellCount);
+    }
+
+    function generateBasicDoubleCard(rng, activeCorners, forcedDoubleId = null) {
+      const card = Array(16).fill(null);
+      const doubleId = forcedDoubleId ?? randInt(rng, 1, IMAGE_COUNT);
+      const patternId = choosePatternId(activeCorners, rng);
+      const [a, b] = DOUBLE_PATTERNS[patternId];
+
+      card[a] = doubleId;
+      card[b] = doubleId;
+
+      const pool = shuffle(imageDeck().filter((n) => n !== doubleId), rng);
+      let p = 0;
+
+      for (let i = 0; i < card.length; i++) {
+        if (card[i] === null) {
+          card[i] = pool[p++];
+        }
+      }
+
+      return card;
+    }
+
+    function generateMultipleGroup({
+      groupSize,
+      rng,
+      doubleMode = false,
+      activeCorners = false,
+      forcedDoubleIds = null,
+    }) {
+      const cards = Array.from({ length: groupSize }, () => Array(16).fill(null));
+      let doubleIds = [];
+
+      if (doubleMode) {
+        doubleIds = forcedDoubleIds || shuffle(imageDeck(), rng).slice(0, groupSize);
+
+        cards.forEach((card, index) => {
+          const patternId = choosePatternId(activeCorners, rng);
+          const [a, b] = DOUBLE_PATTERNS[patternId];
+          card[a] = doubleIds[index];
+          card[b] = doubleIds[index];
+        });
+      }
+
+      const availableBase = imageDeck().filter((n) => !doubleIds.includes(n));
+      const basePool = shuffle(availableBase, rng);
+      const emptyCells = [];
+
+      cards.forEach((card, cardIndex) => {
+        card.forEach((value, cellIndex) => {
+          if (value === null) {
+            emptyCells.push({ cardIndex, cellIndex });
+          }
+        });
+      });
+
+      const shuffledCells = shuffle(emptyCells, rng);
+      const baseNeeded = Math.min(basePool.length, shuffledCells.length);
+
+      for (let i = 0; i < baseNeeded; i++) {
+        const { cardIndex, cellIndex } = shuffledCells[i];
+        cards[cardIndex][cellIndex] = basePool[i];
+      }
+
+      for (const card of cards) {
+        for (let i = 0; i < card.length; i++) {
+          if (card[i] === null) {
+            const options = imageDeck().filter((n) => !card.includes(n));
+            card[i] = options[randInt(rng, 0, options.length - 1)];
+          }
+        }
+      }
+
+      return cards;
+    }
+
+    function generateMultipleDoublePlus({ groupSize, rng, activeCorners }) {
+      const totalCards = Math.ceil(IMAGE_COUNT / groupSize) * groupSize;
+      const extraCount = totalCards - IMAGE_COUNT;
+
+      const doubleIds = shuffle([
+        ...imageDeck(),
+        ...Array.from({ length: extraCount }, () => randInt(rng, 1, IMAGE_COUNT)),
+      ], rng);
+
+      const cards = [];
+
+      for (let i = 0; i < totalCards; i += groupSize) {
+        const groupDoubleIds = doubleIds.slice(i, i + groupSize);
+
+        cards.push(
+          ...generateMultipleGroup({
+            groupSize,
+            rng,
+            doubleMode: true,
+            activeCorners,
+            forcedDoubleIds: groupDoubleIds,
+          })
+        );
+      }
+
+      return cards;
+    }
+
+    function createGridLayout(cols, rows) {
+      const slots = [];
+
+      for (let row = 0; row < rows; row++) {
+        for (let col = 0; col < cols; col++) {
+          slots.push({ col, row, w: 1, h: 1 });
+        }
+      }
+
+      return {
+        type: "grid",
+        cols,
+        rows,
+        slots,
+      };
+    }
+
+    function createPozoLayout() {
+      const slots = [];
+
+      for (let col = 0; col < 5; col++) slots.push({ col, row: 0, w: 1, h: 1 });
+      for (let row = 1; row < 4; row++) slots.push({ col: 4, row, w: 1, h: 1 });
+      for (let col = 4; col >= 0; col--) slots.push({ col, row: 4, w: 1, h: 1 });
+      for (let row = 3; row >= 1; row--) slots.push({ col: 0, row, w: 1, h: 1 });
+
+      slots.push({ col: 1, row: 1, w: 3, h: 3, featured: true });
+
+      return {
+        type: "pozo",
+        cols: 5,
+        rows: 5,
+        slots,
+      };
+    }
+
+    async function renderCurrentCard() {
+      if (!state.result) return;
+
+      const card = state.result.cards[state.currentIndex];
+      const cacheKey = makeCacheKey(state.currentIndex);
+
+      let canvas = state.currentCache.get(cacheKey);
+
+      if (!canvas) {
+        canvas = await renderCardToCanvasLocal({
+          card,
+          layout: state.result.layout,
+          size: getSelectedCardSize(),
+          imageResolver: resolveImage,
+          drawCanvasFrame: els.drawCanvasFrame.checked,
+          drawCross: els.drawCross.checked,
+        });
+
+        state.currentCache.set(cacheKey, canvas);
+      }
+
+      state.currentCanvas = canvas;
+
+      els.currentPreview.innerHTML = "";
+      els.currentPreview.appendChild(cloneCanvas(canvas));
+
+      els.currentCounter.textContent = `${state.currentIndex + 1} / ${state.result.cards.length}`;
+      els.currentSummary.textContent =
+        `Carta ${state.currentIndex + 1}: ${card.join(", ")}`;
+
+      els.jumpToCard.value = state.currentIndex + 1;
+
+      highlightGalleryCard();
+    }
+
+    async function renderGallery() {
+      if (!state.result) return;
+
+      els.previewGrid.innerHTML = "";
+
+      const total = state.result.cards.length;
+      const previewLimit = Math.max(1, numberOrDefault(els.previewLimit.value, 40));
+      const renderCount = Math.min(total, previewLimit);
+
+      els.summary.textContent =
+        `Mostrando ${renderCount} de ${total} carta(s). La exportación incluye todas.`;
+
+      for (let i = 0; i < renderCount; i++) {
+        els.status.textContent = `Renderizando galería ${i + 1} de ${renderCount}...`;
+
+        const cacheKey = makeCacheKey(i);
+        let canvas = state.galleryCache.get(cacheKey);
+
+        if (!canvas) {
+          canvas = await renderCardToCanvasLocal({
+            card: state.result.cards[i],
+            layout: state.result.layout,
+            size: getSelectedCardSize(),
+            imageResolver: resolveImage,
+            drawCanvasFrame: els.drawCanvasFrame.checked,
+            drawCross: els.drawCross.checked,
+          });
+
+          state.galleryCache.set(cacheKey, canvas);
+        }
+
+        appendGalleryCard({
+          index: i,
+          canvas,
+          numbers: state.result.cards[i],
+        });
+
+        await waitFrame();
+      }
+
+      highlightGalleryCard();
+      els.status.textContent = "Galería lista.";
+    }
+
+    function appendGalleryCard({ index, canvas, numbers }) {
+      const box = document.createElement("article");
+      box.className = "gallery-card";
+      box.dataset.cardIndex = String(index);
+
+      const title = document.createElement("div");
+      title.className = "gallery-card-title";
+      title.textContent = `Carta ${index + 1}`;
+
+      const cloned = cloneCanvas(canvas);
+
+      const buttonRow = document.createElement("div");
+      buttonRow.className = "mini-actions";
+
+      const viewBtn = document.createElement("button");
+      viewBtn.className = "button-secondary button-small";
+      viewBtn.textContent = "Ver";
+      viewBtn.addEventListener("click", async (event) => {
+        event.stopPropagation();
+        state.currentIndex = index;
+        await renderCurrentCard();
+        activateTab("current");
+      });
+
+      const downloadBtn = document.createElement("button");
+      downloadBtn.className = "button-secondary button-small";
+      downloadBtn.textContent = "PNG";
+      downloadBtn.addEventListener("click", (event) => {
+        event.stopPropagation();
+        downloadCanvas(canvas, makeCardFilename(state.result.mode, index + 1));
+      });
+
+      const numbersBox = document.createElement("div");
+      numbersBox.className = "numbers";
+      numbersBox.textContent = numbers.join(", ");
+
+      buttonRow.appendChild(viewBtn);
+      buttonRow.appendChild(downloadBtn);
+
+      box.appendChild(title);
+      box.appendChild(cloned);
+      box.appendChild(buttonRow);
+      box.appendChild(numbersBox);
+
+      box.addEventListener("click", async () => {
+        state.currentIndex = index;
+        await renderCurrentCard();
+        activateTab("current");
+      });
+
+      els.previewGrid.appendChild(box);
+    }
+
+    function highlightGalleryCard() {
+      document.querySelectorAll(".gallery-card").forEach((card) => {
+        card.classList.toggle(
+          "selected",
+          Number(card.dataset.cardIndex) === state.currentIndex
+        );
+      });
+    }
+
+    async function photoAndNext() {
+      if (!state.result) return;
+
+      await ensureCurrentCanvas();
+      downloadCanvas(state.currentCanvas, makeCardFilename(state.result.mode, state.currentIndex + 1));
+
+      await delay(500);
+      await nextCard();
+    }
+
+    async function downloadCurrent() {
+      if (!state.result) return;
+
+      await ensureCurrentCanvas();
+      downloadCanvas(state.currentCanvas, makeCardFilename(state.result.mode, state.currentIndex + 1));
+    }
+
+    async function ensureCurrentCanvas() {
+      if (!state.currentCanvas) {
+        await renderCurrentCard();
+      }
+    }
+
+    async function previousCard() {
+      if (!state.result) return;
+
+      state.currentIndex = Math.max(0, state.currentIndex - 1);
+      await renderCurrentCard();
+    }
+
+    async function nextCard() {
+      if (!state.result) return;
+
+      state.currentIndex = Math.min(state.result.cards.length - 1, state.currentIndex + 1);
+      await renderCurrentCard();
+    }
+
+    async function jumpToCard() {
+      if (!state.result) return;
+
+      const target = numberOrDefault(els.jumpToCard.value, 1);
+      const index = Math.max(0, Math.min(state.result.cards.length - 1, target - 1));
+
+      state.currentIndex = index;
+      await renderCurrentCard();
+    }
+
+    async function downloadIndividualExport() {
+      if (!state.result) {
+        els.exportStatus.textContent = "Primero genera cartas.";
+        return;
+      }
+
+      setBusy(true);
+
+      try {
+        const files = [];
+        const total = state.result.cards.length;
+
+        for (let i = 0; i < total; i++) {
+          els.exportStatus.textContent = `Renderizando carta ${i + 1} de ${total}...`;
+
+          const canvas = await renderCardToCanvasLocal({
+            card: state.result.cards[i],
+            layout: state.result.layout,
+            size: getSelectedCardSize(),
+            imageResolver: resolveImage,
+            drawCanvasFrame: els.drawCanvasFrame.checked,
+            drawCross: els.drawCross.checked,
+          });
+
+          const blob = await canvasToBlob(canvas);
+
+          files.push({
+            filename: makeCardFilename(state.result.mode, i + 1),
+            blob,
+          });
+
+          await waitFrame();
+        }
+
+        await downloadFilesSmart(files, {
+          zipName: getZipName("percal_cartas.zip"),
+          folderName: getFolderName(),
+        });
+
+        els.exportStatus.textContent =
+          files.length === 1
+            ? "Listo. Se descargó 1 PNG."
+            : `Listo. Se descargaron ${files.length} cartas en ZIP.`;
+      } catch (error) {
+        console.error(error);
+        els.exportStatus.textContent = `Error al exportar: ${error.message}`;
+      } finally {
+        setBusy(false);
+      }
+    }
+
+    async function previewSheets() {
+      if (!state.result) {
+        els.sheetStatus.textContent = "Primero genera cartas.";
+        return;
+      }
+
+      setBusy(true);
+      els.sheetPreviewPanel.classList.remove("hidden");
+      els.sheetPreviewGrid.innerHTML = "";
+
+      try {
+        state.sheetFiles = await renderSheetFiles();
+
+        for (const file of state.sheetFiles) {
+          const canvas = await blobToCanvas(file.blob);
+          appendSheetPreview({
+            index: file.index,
+            filename: file.filename,
+            blob: file.blob,
+            canvas,
+            cardCount: file.cardCount,
+          });
+
+          await waitFrame();
+        }
+
+        els.sheetSummary.textContent = `${state.sheetFiles.length} pliego(s) generado(s).`;
+        els.sheetStatus.textContent = "Preview de pliegos listo.";
+      } catch (error) {
+        console.error(error);
+        els.sheetStatus.textContent = `Error en pliegos: ${error.message}`;
+      } finally {
+        setBusy(false);
+      }
+    }
+
+    async function downloadSheetsExport() {
+      if (!state.result) {
+        els.sheetStatus.textContent = "Primero genera cartas.";
+        return;
+      }
+
+      setBusy(true);
+
+      try {
+        const files = await renderSheetFiles();
+
+        await downloadFilesSmart(files, {
+          zipName: getZipName("percal_pliegos.zip"),
+          folderName: getFolderName(),
+        });
+
+        els.sheetStatus.textContent =
+          files.length === 1
+            ? "Listo. Se descargó 1 pliego."
+            : `Listo. Se descargaron ${files.length} pliegos en ZIP.`;
+      } catch (error) {
+        console.error(error);
+        els.sheetStatus.textContent = `Error al descargar pliegos: ${error.message}`;
+      } finally {
+        setBusy(false);
+      }
+    }
+
+    async function renderSheetFiles() {
+      const options = getSheetOptions();
+      const groups = chunkArray(state.result.cards, options.cardsPerSheet);
+      const files = [];
+
+      for (let i = 0; i < groups.length; i++) {
+        els.sheetStatus.textContent = `Renderizando pliego ${i + 1} de ${groups.length}...`;
+
+        const canvas = await renderSheetCanvas({
+          cards: groups[i],
+          layout: state.result.layout,
+          size: getSelectedCardSize(),
+          ...options,
+        });
+
+        const blob = await canvasToBlob(canvas);
+
+        files.push({
+          index: i + 1,
+          filename: makeSheetFilename(state.result.mode, i + 1),
+          blob,
+          cardCount: groups[i].length,
+        });
+
+        await waitFrame();
+      }
+
+      return files;
+    }
+
+    function getSheetOptions() {
+      return {
+        cardsPerSheet: Math.max(1, numberOrDefault(els.cardsPerSheet.value, 8)),
+        columns: numberOrNull(els.columns.value),
+        gap: Math.max(0, numberOrDefault(els.gap.value, 20)),
+        padding: Math.max(0, numberOrDefault(els.padding.value, 30)),
+        sheetWidth: numberOrNull(els.sheetWidth.value),
+        sheetHeight: numberOrNull(els.sheetHeight.value),
+        cutGuideLength: Math.max(1, numberOrDefault(els.cutGuideLength.value, 12)),
+        cutGuideOffset: Math.max(0, numberOrDefault(els.cutGuideOffset.value, 4)),
+        showCutGuides: els.showCutGuides.checked,
+      };
+    }
+
+    async function renderSheetCanvas({
+      cards,
+      layout,
+      size,
+      cardsPerSheet,
+      columns,
+      gap,
+      padding,
+      sheetWidth,
+      sheetHeight,
+      showCutGuides,
+      cutGuideLength,
+      cutGuideOffset,
+    }) {
+      const cols = columns || guessBestColumns(cards.length, size.width / size.height);
+      const rows = Math.ceil(cards.length / cols);
+
+      let cardW = size.width;
+      let cardH = size.height;
+      let canvasW;
+      let canvasH;
+
+      if (sheetWidth && sheetHeight) {
+        const availableW = sheetWidth - padding * 2 - gap * (cols - 1);
+        const availableH = sheetHeight - padding * 2 - gap * (rows - 1);
+
+        if (availableW <= 0 || availableH <= 0) {
+          throw new Error("El pliego es muy pequeño para el margen/separación.");
+        }
+
+        const scale = Math.min(availableW / cols / cardW, availableH / rows / cardH);
+
+        cardW = Math.floor(cardW * scale);
+        cardH = Math.floor(cardH * scale);
+        canvasW = sheetWidth;
+        canvasH = sheetHeight;
+      } else {
+        canvasW = padding * 2 + cols * cardW + (cols - 1) * gap;
+        canvasH = padding * 2 + rows * cardH + (rows - 1) * gap;
+      }
+
+      const canvas = document.createElement("canvas");
+      canvas.width = canvasW;
+      canvas.height = canvasH;
+
+      const ctx = canvas.getContext("2d");
+      ctx.fillStyle = "white";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      const totalGridW = cols * cardW + (cols - 1) * gap;
+      const totalGridH = rows * cardH + (rows - 1) * gap;
+
+      const startX = Math.floor((canvasW - totalGridW) / 2);
+      const startY = Math.floor((canvasH - totalGridH) / 2);
+
+      for (let i = 0; i < cards.length; i++) {
+        const row = Math.floor(i / cols);
+        const col = i % cols;
+
+        const x = startX + col * (cardW + gap);
+        const y = startY + row * (cardH + gap);
+
+        const cardCanvas = await renderCardToCanvasLocal({
+          card: cards[i],
+          layout,
+          size,
+          imageResolver: resolveImage,
+          drawCanvasFrame: els.drawCanvasFrame.checked,
+          drawCross: els.drawCross.checked,
+        });
+
+        ctx.drawImage(cardCanvas, x, y, cardW, cardH);
+
+        if (showCutGuides) {
+          drawCutGuides(ctx, x, y, cardW, cardH, {
+            length: cutGuideLength,
+            offset: cutGuideOffset,
+          });
+        }
+      }
+
+      return canvas;
+    }
+
+    function appendSheetPreview({ index, filename, blob, canvas, cardCount }) {
+      const box = document.createElement("article");
+      box.className = "sheet-card";
+
+      const title = document.createElement("div");
+      title.className = "sheet-card-title";
+      title.textContent = `Pliego ${index} — ${cardCount} carta(s)`;
+
+      const button = document.createElement("button");
+      button.className = "button-secondary button-small";
+      button.textContent = "Descargar PNG";
+      button.addEventListener("click", () => downloadBlob(blob, filename));
+
+      box.appendChild(title);
+      box.appendChild(canvas);
+      box.appendChild(button);
+
+      els.sheetPreviewGrid.appendChild(box);
+    }
+
+    async function renderCardToCanvasLocal({
+      card,
+      layout,
+      size,
+      imageResolver,
+      background = "white",
+      drawCanvasFrame = true,
+      drawCross = false,
+    }) {
+      const canvas = document.createElement("canvas");
+      canvas.width = size.width;
+      canvas.height = size.height;
+
+      const ctx = canvas.getContext("2d");
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = "high";
+
+      ctx.fillStyle = background;
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      const cellW = canvas.width / layout.cols;
+      const cellH = canvas.height / layout.rows;
+
+      for (let i = 0; i < layout.slots.length; i++) {
+        const imageId = card[i];
+        if (!imageId) continue;
+
+        const slot = layout.slots[i];
+        const img = await loadImage(await imageResolver(imageId, Number(els.sizeId.value), i));
+
+        const x = slot.col * cellW;
+        const y = slot.row * cellH;
+        const w = slot.w * cellW;
+        const h = slot.h * cellH;
+
+        ctx.drawImage(img, x, y, w, h);
+
+        if (slot.featured) {
+          ctx.save();
+          ctx.lineWidth = 3;
+          ctx.strokeStyle = "rgba(0,0,0,0.75)";
+          ctx.strokeRect(x + 1.5, y + 1.5, w - 3, h - 3);
+          ctx.restore();
+        }
+      }
+
+      if (drawCanvasFrame) {
+        drawCardFrame(ctx, canvas.width, canvas.height);
+      }
+
+      if (drawCross) {
+        drawCenterCross(ctx, canvas.width, canvas.height);
+      }
+
+      return canvas;
+    }
+
+    async function resolveImage(imageId, sizeId) {
+      return defaultImageUrl(imageId, sizeId, els.imageExtension.value);
+    }
+
+    function getSelectedCardSize() {
+      const sizeId = Number(els.sizeId.value);
+
+      if (sizeId === 4) {
+        return {
+          width: numberOrDefault(els.size4Width.value, 302),
+          height: numberOrDefault(els.size4Height.value, 454),
+          cm: els.size4Cm.value.trim() || "12.0 x 8.0",
+        };
+      }
+
+      return CARD_SIZES[sizeId];
+    }
+
+    function syncModeOptions() {
+      const mode = els.mode.value;
+      const isMultiple = ["multiple", "multipleDoble", "multipleDoblePlus"].includes(mode);
+      const quantityApplies = ["basica", "basicaDoble", "penta", "pozo"].includes(mode);
+
+      els.multipleOptions.classList.toggle("soft-disabled", !isMultiple);
+      els.multipleCount.disabled = !isMultiple;
+
+      els.quantity.disabled = !quantityApplies;
+      els.quantity.parentElement.classList.toggle("soft-disabled", !quantityApplies);
+    }
+
+    function syncSizeOptions() {
+      els.size4Editor.classList.toggle("hidden", Number(els.sizeId.value) !== 4);
+      resetRenderCaches();
+    }
+
+    function applySheetPreset() {
+      const value = els.sheetPreset.value;
+
+      if (value === "letter-300") {
+        els.sheetWidth.value = 2550;
+        els.sheetHeight.value = 3300;
+      } else if (value === "tabloid-300") {
+        els.sheetWidth.value = 3300;
+        els.sheetHeight.value = 5100;
+      } else if (value === "a4-300") {
+        els.sheetWidth.value = 2480;
+        els.sheetHeight.value = 3508;
+      } else if (value === "") {
+        els.sheetWidth.value = "";
+        els.sheetHeight.value = "";
+      }
+    }
+
+    function clearAll() {
+      state.result = null;
+      state.currentIndex = 0;
+      state.currentCanvas = null;
+      state.sheetFiles = [];
+
+      clearGeneratedOnly();
+
+      els.status.textContent = "";
+      els.exportStatus.textContent = "";
+      els.sheetStatus.textContent = "";
+      els.globalStatusBadge.textContent = "Sin generar";
+      els.globalStatusBadge.className = "badge badge-neutral";
+
+      enableAfterGenerate(false);
+    }
+
+    function clearGeneratedOnly() {
+      resetRenderCaches();
+
+      els.previewGrid.innerHTML = "";
+      els.currentPreview.innerHTML = '<div class="empty-state">Genera cartas para ver la carta actual.</div>';
+      els.sheetPreviewGrid.innerHTML = "";
+      els.sheetPreviewPanel.classList.add("hidden");
+
+      els.summary.textContent = "Sin cartas generadas.";
+      els.currentSummary.textContent = "Sin carta seleccionada.";
+      els.currentCounter.textContent = "0 / 0";
+      els.sheetSummary.textContent = "Sin pliegos generados.";
+    }
+
+    function resetRenderCaches() {
+      state.galleryCache.clear();
+      state.currentCache.clear();
+      state.currentCanvas = null;
+      state.sheetFiles = [];
+    }
+
+    function enableAfterGenerate(enabled) {
+      els.photoBtn.disabled = !enabled;
+      els.downloadCurrentBtn.disabled = !enabled;
+      els.previousBtn.disabled = !enabled;
+      els.nextBtn.disabled = !enabled;
+      els.jumpBtn.disabled = !enabled;
+      els.refreshGalleryBtn.disabled = !enabled;
+      els.downloadIndividualBtn.disabled = !enabled;
+      els.previewSheetsBtn.disabled = !enabled;
+      els.downloadSheetsBtn.disabled = !enabled;
+    }
+
+    function setBusy(isBusy) {
+      document.querySelectorAll("button, input, select").forEach((el) => {
+        if (el.id === "clearBtn") return;
+        el.disabled = isBusy;
+      });
+
+      if (!isBusy) {
+        syncModeOptions();
+        syncSizeOptions();
+
+        if (state.result) {
+          enableAfterGenerate(true);
+        } else {
+          enableAfterGenerate(false);
+        }
+      }
+    }
+
+    function getZipName(defaultName) {
+      const value = els.zipName.value.trim();
+      if (!value) return defaultName;
+      return value.endsWith(".zip") ? value : `${value}.zip`;
+    }
+
+    function getFolderName() {
+      return els.folderName.value.trim() || "percal";
+    }
+
+    async function downloadFilesSmart(files, { zipName, folderName }) {
+      if (files.length === 1) {
+        downloadBlob(files[0].blob, files[0].filename);
+        return;
+      }
+
+      const blob = await createZip(files, { folderName });
+      downloadBlob(blob, zipName);
+    }
+
+    async function createZip(files, { folderName }) {
+      if (!window.JSZip) {
+        throw new Error("JSZip no está cargado.");
+      }
+
+      const zip = new JSZip();
+      const folder = folderName ? zip.folder(folderName) : zip;
+
+      for (const file of files) {
+        folder.file(file.filename, file.blob);
+      }
+
+      return await zip.generateAsync({
+        type: "blob",
+        compression: "DEFLATE",
+        compressionOptions: { level: 6 },
+      });
+    }
+
+    function drawCardFrame(ctx, width, height) {
+      ctx.save();
+      ctx.lineWidth = 2;
+      ctx.strokeStyle = "rgba(0,0,0,0.55)";
+      ctx.strokeRect(1, 1, width - 2, height - 2);
+      ctx.restore();
+    }
+
+    function drawCenterCross(ctx, width, height) {
+      ctx.save();
+      ctx.lineWidth = 1;
+      ctx.strokeStyle = "rgba(190,0,0,0.75)";
+      ctx.beginPath();
+      ctx.moveTo(width / 2, 0);
+      ctx.lineTo(width / 2, height);
+      ctx.moveTo(0, height / 2);
+      ctx.lineTo(width, height / 2);
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    function drawCutGuides(ctx, x, y, w, h, { length = 12, offset = 4 } = {}) {
+      ctx.save();
+      ctx.strokeStyle = "rgba(0,0,0,0.75)";
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+
+      ctx.moveTo(x - offset - length, y - offset);
+      ctx.lineTo(x - offset, y - offset);
+      ctx.moveTo(x - offset, y - offset - length);
+      ctx.lineTo(x - offset, y - offset);
+
+      ctx.moveTo(x + w + offset, y - offset);
+      ctx.lineTo(x + w + offset + length, y - offset);
+      ctx.moveTo(x + w + offset, y - offset - length);
+      ctx.lineTo(x + w + offset, y - offset);
+
+      ctx.moveTo(x - offset - length, y + h + offset);
+      ctx.lineTo(x - offset, y + h + offset);
+      ctx.moveTo(x - offset, y + h + offset);
+      ctx.lineTo(x - offset, y + h + offset + length);
+
+      ctx.moveTo(x + w + offset, y + h + offset);
+      ctx.lineTo(x + w + offset + length, y + h + offset);
+      ctx.moveTo(x + w + offset, y + h + offset);
+      ctx.lineTo(x + w + offset, y + h + offset + length);
+
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    function allowedPatternIds(activeCorners) {
+      return activeCorners ? [0, 1, 2, 3, 4] : [2, 3, 4];
+    }
+
+    function choosePatternId(activeCorners, rng) {
+      const ids = allowedPatternIds(activeCorners);
+      return ids[randInt(rng, 0, ids.length - 1)];
+    }
+
+    function imageDeck() {
+      return range(1, IMAGE_COUNT);
+    }
+
+    function makeRng(seed = cryptoRandomSeed()) {
+      let t = seed >>> 0;
+
+      const rng = () => {
+        t += 0x6D2B79F5;
+        let x = Math.imul(t ^ (t >>> 15), 1 | t);
+        x ^= x + Math.imul(x ^ (x >>> 7), 61 | x);
+        return ((x ^ (x >>> 14)) >>> 0) / 4294967296;
+      };
+
+      rng.seed = seed >>> 0;
+      return rng;
+    }
+
+    function cryptoRandomSeed() {
+      const arr = new Uint32Array(1);
+      globalThis.crypto?.getRandomValues?.(arr);
+      return arr[0] || Math.floor(Math.random() * 2 ** 32);
+    }
+
+    function range(start, endInclusive) {
+      return Array.from({ length: endInclusive - start + 1 }, (_, i) => start + i);
+    }
+
+    function randInt(rng, minInclusive, maxInclusive) {
+      return Math.floor(rng() * (maxInclusive - minInclusive + 1)) + minInclusive;
+    }
+
+    function shuffle(values, rng) {
+      const arr = [...values];
+
+      for (let i = arr.length - 1; i > 0; i--) {
+        const j = randInt(rng, 0, i);
+        [arr[i], arr[j]] = [arr[j], arr[i]];
+      }
+
+      return arr;
+    }
+
+    function chunkArray(arr, size) {
+      const out = [];
+
+      for (let i = 0; i < arr.length; i += size) {
+        out.push(arr.slice(i, i + size));
+      }
+
+      return out;
+    }
+
+    function guessBestColumns(count, aspectRatio) {
+      let best = 1;
+      let bestScore = Infinity;
+
+      for (let cols = 1; cols <= count; cols++) {
+        const rows = Math.ceil(count / cols);
+        const ratio = (cols * aspectRatio) / rows;
+        const score = Math.abs(ratio - 1.4);
+
+        if (score < bestScore) {
+          bestScore = score;
+          best = cols;
+        }
+      }
+
+      return best;
+    }
+
+    function makeCacheKey(index) {
+      return [
+        index,
+        els.sizeId.value,
+        els.imageExtension.value,
+        els.drawCanvasFrame.checked ? "frame" : "noframe",
+        els.drawCross.checked ? "cross" : "nocross",
+        els.size4Width.value,
+        els.size4Height.value,
+      ].join("|");
+    }
+
+    function makeCardFilename(mode, index) {
+      return `${mode}_${String(index).padStart(3, "0")}.png`;
+    }
+
+    function makeSheetFilename(mode, index) {
+      return `${mode}_pliego_${String(index).padStart(3, "0")}.png`;
+    }
+
+    function cloneCanvas(source) {
+      const canvas = document.createElement("canvas");
+      canvas.width = source.width;
+      canvas.height = source.height;
+      canvas.getContext("2d").drawImage(source, 0, 0);
+      return canvas;
+    }
+
+    function downloadCanvas(canvas, filename) {
+      canvas.toBlob((blob) => {
+        if (!blob) return;
+        downloadBlob(blob, filename);
+      }, "image/png");
+    }
+
+    function canvasToBlob(canvas) {
+      return new Promise((resolve, reject) => {
+        canvas.toBlob((blob) => {
+          if (blob) resolve(blob);
+          else reject(new Error("No se pudo exportar el canvas."));
+        }, "image/png");
+      });
+    }
+
+    async function blobToCanvas(blob) {
+      const bitmap = await createImageBitmap(blob);
+      const canvas = document.createElement("canvas");
+      canvas.width = bitmap.width;
+      canvas.height = bitmap.height;
+      canvas.getContext("2d").drawImage(bitmap, 0, 0);
+      return canvas;
+    }
+
+    function loadImage(srcOrImage) {
+      if (srcOrImage instanceof HTMLImageElement || srcOrImage instanceof ImageBitmap) {
+        return Promise.resolve(srcOrImage);
+      }
+
+      return new Promise((resolve, reject) => {
+        const img = new Image();
+        img.onload = () => resolve(img);
+        img.onerror = () => reject(new Error(`No se pudo cargar imagen: ${srcOrImage}`));
+        img.src = srcOrImage;
+      });
+    }
+
+    function waitFrame() {
+      return new Promise((resolve) => requestAnimationFrame(resolve));
+    }
+
+    function delay(ms) {
+      return new Promise((resolve) => setTimeout(resolve, ms));
+    }
+
+    function numberOrNull(value) {
+      const trimmed = String(value ?? "").trim();
+      if (trimmed === "") return null;
+
+      const n = Number(trimmed);
+      return Number.isFinite(n) ? n : null;
+    }
+
+    function numberOrDefault(value, fallback) {
+      const n = numberOrNull(value);
+      return n === null ? fallback : n;
+    }
+  </script>
+</body>
+</html>
