@@ -24,6 +24,10 @@
     </header>
 
     <nav class="tabs" aria-label="Secciones">
+      <label class="nav-check-row" title="Muestra solo las posiciones en X sin modificar la generación">
+        <input id="drawCross" type="checkbox" />
+        <span>Cruz visual</span>
+      </label>
       <button class="tab-button active" data-tab="generation">Generación</button>
       <button class="tab-button" data-tab="current">Carta actual</button>
       <button class="tab-button" data-tab="gallery">Galería</button>
@@ -49,10 +53,12 @@
               <option value="basica">Básica</option>
               <option value="basicaDoble">Básica Doble</option>
               <option value="basicaDoblePlus">Básica Doble Plus</option>
-              <option value="multiple">Función múltiple</option>
-              <option value="multipleDoble">Función múltiple doble</option>
-              <option value="multipleDoblePlus">Función múltiple doble plus</option>
-              <option value="penta">Penta — 5x5</option>
+              <option value="multiple">Multiple</option>
+              <option value="multipleDoble">Multiple doble</option>
+              <option value="multipleDoblePlus">Multiple doble plus</option>
+              <option value="penta">Penta simple — 5x5</option>
+              <option value="pentaPlus">Penta plus — 54 cartas</option>
+              <option value="canvasFull">Canvas full</option>
               <option value="pozo">Pozo — layout provisional</option>
             </select>
           </div>
@@ -63,16 +69,18 @@
               <option value="1">1 — 212x360 px</option>
               <option value="2">2 — 272x367 px</option>
               <option value="3">3 — 316x396 px</option>
-              <option value="4">4 — editable</option>
+              <option value="4">4 — 435x548 px / 14.5x11.5 cm</option>
               <option value="5">5 — 332x516 px</option>
               <option value="6">6 — 436x700 px</option>
+              <option value="7">GRANDE — 624x1002 px / 26.5x16.5 cm</option>
+              <option value="custom">Personalizable cm → px</option>
             </select>
           </div>
 
           <div class="field">
             <label for="quantity">Cantidad de cartas</label>
             <input id="quantity" type="number" value="1" min="1" />
-            <small>Aplica a Básica, Básica Doble, Penta y Pozo.</small>
+            <small>Aplica a Básica, Básica Doble, Penta simple y Pozo.</small>
           </div>
 
           <div class="field">
@@ -81,7 +89,7 @@
           </div>
 
           <div class="field">
-            <label for="imageExtension">Extensión</label>
+            <label for="imageExtension">Extensión fotos fuente</label>
             <select id="imageExtension">
               <option value="jpg">.jpg</option>
               <option value="png">.png</option>
@@ -114,40 +122,48 @@
             </label>
           </div>
 
-          <div class="field checkbox-field">
-            <label>Canvas</label>
-            <label class="check-row">
-              <input id="drawCanvasFrame" type="checkbox" checked />
-              <span>Marco en todos los tamaños</span>
-            </label>
-          </div>
+          <input id="drawCanvasFrame" type="checkbox" hidden />
 
-          <div class="field checkbox-field">
-            <label>Cruz</label>
-            <label class="check-row">
-              <input id="drawCross" type="checkbox" />
-              <span>Cruz visual</span>
-            </label>
+          <div id="canvasFullOptions" class="field full-span hidden">
+            <label for="canvasFullNumbers">Canvas full: números separados por coma</label>
+            <textarea id="canvasFullNumbers" rows="3" placeholder="Ej. 1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16"></textarea>
+            <small>Arma una carta desde cero usando exactamente la secuencia capturada.</small>
           </div>
         </div>
 
         <div id="size4Editor" class="subpanel hidden">
-          <h3>Actualizar Tamaño 4</h3>
+          <h3>Medida personalizable cm → px</h3>
 
           <div class="form-grid compact">
             <div class="field">
-              <label for="size4Width">Ancho</label>
-              <input id="size4Width" type="number" value="302" min="1" />
+              <label for="customHeightCm">Alto cm</label>
+              <input id="customHeightCm" type="number" value="14.5" min="0.1" step="0.1" />
             </div>
 
             <div class="field">
-              <label for="size4Height">Alto</label>
-              <input id="size4Height" type="number" value="454" min="1" />
+              <label for="customWidthCm">Ancho cm</label>
+              <input id="customWidthCm" type="number" value="11.5" min="0.1" step="0.1" />
             </div>
 
             <div class="field">
-              <label for="size4Cm">Medida cm</label>
-              <input id="size4Cm" type="text" value="12.0 x 8.0" />
+              <label for="customDpi">DPI / PPI</label>
+              <input id="customDpi" type="number" value="96" min="1" />
+              <small>96 px/pulgada = 37.795 px/cm.</small>
+            </div>
+
+            <div class="field">
+              <label for="size4Width">Ancho px</label>
+              <input id="size4Width" type="number" value="435" min="1" />
+            </div>
+
+            <div class="field">
+              <label for="size4Height">Alto px</label>
+              <input id="size4Height" type="number" value="548" min="1" />
+            </div>
+
+            <div class="field">
+              <label for="size4Cm">Medida final</label>
+              <input id="size4Cm" type="text" value="14.5 x 11.5" />
             </div>
           </div>
         </div>
@@ -191,7 +207,7 @@
             </div>
 
             <div class="hint-box">
-              El botón <strong>Foto + siguiente</strong> descarga la carta actual y avanza después de 500 ms.
+              El botón <strong>Foto + siguiente</strong> descarga la carta actual en JPG y avanza después de 500 ms.
             </div>
           </aside>
 
@@ -230,7 +246,7 @@
             <h2>Exportación</h2>
             <p>Descarga cartas individuales. Si hay varias, se empaquetan en ZIP.</p>
           </div>
-          <span class="badge">PNG / ZIP</span>
+          <span class="badge">JPG / ZIP</span>
         </div>
 
         <div class="form-grid">
@@ -267,32 +283,29 @@
         <div class="form-grid">
           <div class="field">
             <label for="cardsPerSheet">Cartas por pliego</label>
-            <input id="cardsPerSheet" type="number" value="8" min="1" />
+            <input id="cardsPerSheet" type="number" value="6" min="1" />
           </div>
 
           <div class="field">
             <label for="columns">Columnas</label>
-            <input id="columns" type="number" value="2" min="1" />
-            <small>Vacío = automático.</small>
+            <input id="columns" type="number" value="6" min="1" />
+            <small>6 columnas = una fila de 6 cartas.</small>
           </div>
 
           <div class="field">
             <label for="gap">Separación px</label>
-            <input id="gap" type="number" value="20" min="0" />
+            <input id="gap" type="number" value="0" min="0" />
           </div>
 
           <div class="field">
             <label for="padding">Margen px</label>
-            <input id="padding" type="number" value="30" min="0" />
+            <input id="padding" type="number" value="0" min="0" />
           </div>
 
           <div class="field">
             <label for="sheetPreset">Preset</label>
             <select id="sheetPreset">
-              <option value="">Sin preset</option>
-              <option value="letter-300">Carta 300 DPI — 2550x3300</option>
-              <option value="tabloid-300">Tabloide 300 DPI — 3300x5100</option>
-              <option value="a4-300">A4 300 DPI — 2480x3508</option>
+              <option value="6x1">6x1 — grupo enorme</option>
               <option value="custom">Personalizado</option>
             </select>
           </div>
@@ -378,11 +391,16 @@
       activeCorners: document.getElementById("activeCorners"),
       drawCanvasFrame: document.getElementById("drawCanvasFrame"),
       drawCross: document.getElementById("drawCross"),
+      canvasFullOptions: document.getElementById("canvasFullOptions"),
+      canvasFullNumbers: document.getElementById("canvasFullNumbers"),
 
       size4Editor: document.getElementById("size4Editor"),
       size4Width: document.getElementById("size4Width"),
       size4Height: document.getElementById("size4Height"),
       size4Cm: document.getElementById("size4Cm"),
+      customHeightCm: document.getElementById("customHeightCm"),
+      customWidthCm: document.getElementById("customWidthCm"),
+      customDpi: document.getElementById("customDpi"),
 
       generateBtn: document.getElementById("generateBtn"),
       clearBtn: document.getElementById("clearBtn"),
@@ -440,6 +458,13 @@
 
     els.mode.addEventListener("change", syncModeOptions);
     els.sizeId.addEventListener("change", syncSizeOptions);
+    [els.activeCorners, els.drawCross, els.imageExtension, els.size4Width, els.size4Height].forEach((el) => {
+      el?.addEventListener("change", resetRenderCachesAndRefresh);
+      el?.addEventListener("input", resetRenderCachesAndRefresh);
+    });
+    [els.customHeightCm, els.customWidthCm, els.customDpi].forEach((el) => {
+      el?.addEventListener("input", syncCustomCmToPx);
+    });
     els.generateBtn.addEventListener("click", generate);
     els.clearBtn.addEventListener("click", clearAll);
 
@@ -532,10 +557,12 @@
         basica: "Básica",
         basicaDoble: "Básica Doble",
         basicaDoblePlus: "Básica Doble Plus",
-        multiple: "Función múltiple",
-        multipleDoble: "Función múltiple doble",
-        multipleDoblePlus: "Función múltiple doble plus",
-        penta: "Penta",
+        multiple: "Multiple",
+        multipleDoble: "Multiple doble",
+        multipleDoblePlus: "Multiple doble plus",
+        penta: "Penta simple",
+        pentaPlus: "Penta plus",
+        canvasFull: "Canvas full",
         pozo: "Pozo",
       };
 
@@ -577,6 +604,7 @@
             label: `${labels[mode]} — ${multipleCount} carta(s)`,
             seed: rng.seed,
             layout: createGridLayout(4, 4),
+            groupSize: multipleCount,
             cards: generateMultipleGroup({
               groupSize: multipleCount,
               rng,
@@ -591,6 +619,7 @@
             label: `${labels[mode]} — ${multipleCount} carta(s)`,
             seed: rng.seed,
             layout: createGridLayout(4, 4),
+            groupSize: multipleCount,
             cards: generateMultipleGroup({
               groupSize: multipleCount,
               rng,
@@ -605,6 +634,7 @@
             label: `${labels[mode]} — grupos de ${multipleCount}`,
             seed: rng.seed,
             layout: createGridLayout(4, 4),
+            groupSize: multipleCount,
             cards: generateMultipleDoublePlus({
               groupSize: multipleCount,
               rng,
@@ -620,6 +650,27 @@
             layout: createGridLayout(5, 5),
             cards: Array.from({ length: quantity }, () => generateUniqueCard(25, rng)),
           };
+
+        case "pentaPlus":
+          return {
+            mode,
+            label: `${labels[mode]} — 54 carta(s)`,
+            seed: rng.seed,
+            layout: createGridLayout(5, 5),
+            cards: generatePentaPlusCards(rng),
+          };
+
+        case "canvasFull": {
+          const card = parseCanvasFullNumbers(els.canvasFullNumbers.value);
+          const side = Math.ceil(Math.sqrt(card.length));
+          return {
+            mode,
+            label: `${labels[mode]} — ${card.length} posición(es)`,
+            seed: rng.seed,
+            layout: createGridLayout(side, side, card.length),
+            cards: [card],
+          };
+        }
 
         case "pozo":
           return {
@@ -637,6 +688,32 @@
 
     function generateUniqueCard(cellCount, rng) {
       return shuffle(imageDeck(), rng).slice(0, cellCount);
+    }
+
+    function generatePentaPlusCards(rng) {
+      return range(1, IMAGE_COUNT).map((centerId) => {
+        const card = Array(25).fill(null);
+        card[12] = centerId;
+        const pool = shuffle(imageDeck().filter((n) => n !== centerId), rng);
+        let p = 0;
+        for (let i = 0; i < card.length; i++) {
+          if (card[i] === null) card[i] = pool[p++];
+        }
+        return card;
+      });
+    }
+
+    function parseCanvasFullNumbers(value) {
+      const values = String(value || "")
+        .split(/[,\n;\s]+/)
+        .map((x) => Number(x.trim()))
+        .filter((n) => Number.isInteger(n) && n >= 1 && n <= IMAGE_COUNT);
+
+      if (!values.length) {
+        throw new Error("Canvas full necesita números entre 1 y 54 separados por coma.");
+      }
+
+      return values;
     }
 
     function generateBasicDoubleCard(rng, activeCorners, forcedDoubleId = null) {
@@ -673,8 +750,10 @@
       if (doubleMode) {
         doubleIds = forcedDoubleIds || shuffle(imageDeck(), rng).slice(0, groupSize);
 
+        const patternIds = choosePatternIdsForGroup(groupSize, activeCorners, rng);
+
         cards.forEach((card, index) => {
-          const patternId = choosePatternId(activeCorners, rng);
+          const patternId = patternIds[index];
           const [a, b] = DOUBLE_PATTERNS[patternId];
           card[a] = doubleIds[index];
           card[b] = doubleIds[index];
@@ -714,17 +793,10 @@
     }
 
     function generateMultipleDoublePlus({ groupSize, rng, activeCorners }) {
-      const totalCards = Math.ceil(IMAGE_COUNT / groupSize) * groupSize;
-      const extraCount = totalCards - IMAGE_COUNT;
-
-      const doubleIds = shuffle([
-        ...imageDeck(),
-        ...Array.from({ length: extraCount }, () => randInt(rng, 1, IMAGE_COUNT)),
-      ], rng);
-
+      const doubleIds = makeMultipleDoublePlusDoubleIds(groupSize, rng);
       const cards = [];
 
-      for (let i = 0; i < totalCards; i += groupSize) {
+      for (let i = 0; i < doubleIds.length; i += groupSize) {
         const groupDoubleIds = doubleIds.slice(i, i + groupSize);
 
         cards.push(
@@ -741,12 +813,35 @@
       return cards;
     }
 
-    function createGridLayout(cols, rows) {
+    function makeMultipleDoublePlusDoubleIds(groupSize, rng) {
+      const totalCards = Math.ceil(IMAGE_COUNT / groupSize) * groupSize;
+      const extraCount = totalCards - IMAGE_COUNT;
+
+      for (let attempt = 0; attempt < 4000; attempt++) {
+        const extras = Array.from({ length: extraCount }, () => randInt(rng, 1, IMAGE_COUNT));
+        const candidate = shuffle([...imageDeck(), ...extras], rng);
+        let ok = true;
+
+        for (let i = 0; i < candidate.length; i += groupSize) {
+          const group = candidate.slice(i, i + groupSize);
+          if (new Set(group).size !== group.length) {
+            ok = false;
+            break;
+          }
+        }
+
+        if (ok) return candidate;
+      }
+
+      throw new Error("No se pudo generar Multiple doble plus con dobles únicos por grupo. Reintenta con otra semilla.");
+    }
+
+    function createGridLayout(cols, rows, limit = cols * rows) {
       const slots = [];
 
       for (let row = 0; row < rows; row++) {
         for (let col = 0; col < cols; col++) {
-          slots.push({ col, row, w: 1, h: 1 });
+          if (slots.length < limit) slots.push({ col, row, w: 1, h: 1 });
         }
       }
 
@@ -800,11 +895,14 @@
       state.currentCanvas = canvas;
 
       els.currentPreview.innerHTML = "";
-      els.currentPreview.appendChild(cloneCanvas(canvas));
+      const currentClone = cloneCanvas(canvas);
+      currentClone.title = "Clic en una foto para cambiar su número";
+      currentClone.addEventListener("click", editCurrentCardCell);
+      els.currentPreview.appendChild(currentClone);
 
       els.currentCounter.textContent = `${state.currentIndex + 1} / ${state.result.cards.length}`;
       els.currentSummary.textContent =
-        `Carta ${state.currentIndex + 1}: ${card.join(", ")}`;
+        `${makeCardDisplayName(state.currentIndex)}: ${card.join(", ")}`;
 
       els.jumpToCard.value = state.currentIndex + 1;
 
@@ -862,7 +960,7 @@
 
       const title = document.createElement("div");
       title.className = "gallery-card-title";
-      title.textContent = `Carta ${index + 1}`;
+      title.textContent = makeCardDisplayName(index);
 
       const cloned = cloneCanvas(canvas);
 
@@ -881,7 +979,7 @@
 
       const downloadBtn = document.createElement("button");
       downloadBtn.className = "button-secondary button-small";
-      downloadBtn.textContent = "PNG";
+      downloadBtn.textContent = "JPG";
       downloadBtn.addEventListener("click", (event) => {
         event.stopPropagation();
         downloadCanvas(canvas, makeCardFilename(state.result.mode, index + 1));
@@ -1005,7 +1103,7 @@
 
         els.exportStatus.textContent =
           files.length === 1
-            ? "Listo. Se descargó 1 PNG."
+            ? "Listo. Se descargó 1 JPG."
             : `Listo. Se descargaron ${files.length} cartas en ZIP.`;
       } catch (error) {
         console.error(error);
@@ -1111,10 +1209,10 @@
 
     function getSheetOptions() {
       return {
-        cardsPerSheet: Math.max(1, numberOrDefault(els.cardsPerSheet.value, 8)),
+        cardsPerSheet: Math.max(1, numberOrDefault(els.cardsPerSheet.value, 6)),
         columns: numberOrNull(els.columns.value),
-        gap: Math.max(0, numberOrDefault(els.gap.value, 20)),
-        padding: Math.max(0, numberOrDefault(els.padding.value, 30)),
+        gap: Math.max(0, numberOrDefault(els.gap.value, 0)),
+        padding: Math.max(0, numberOrDefault(els.padding.value, 0)),
         sheetWidth: numberOrNull(els.sheetWidth.value),
         sheetHeight: numberOrNull(els.sheetHeight.value),
         cutGuideLength: Math.max(1, numberOrDefault(els.cutGuideLength.value, 12)),
@@ -1217,7 +1315,7 @@
 
       const button = document.createElement("button");
       button.className = "button-secondary button-small";
-      button.textContent = "Descargar PNG";
+      button.textContent = "Descargar JPG";
       button.addEventListener("click", () => downloadBlob(blob, filename));
 
       box.appendChild(title);
@@ -1255,7 +1353,12 @@
         if (!imageId) continue;
 
         const slot = layout.slots[i];
-        const img = await loadImage(await imageResolver(imageId, Number(els.sizeId.value), i));
+
+        if (drawCross && !isVisualCrossSlot(slot, layout)) {
+          continue;
+        }
+
+        const img = await loadImage(await imageResolver(imageId, getSourceSizeId(), i));
 
         const x = slot.col * cellW;
         const y = slot.row * cellH;
@@ -1277,25 +1380,28 @@
         drawCardFrame(ctx, canvas.width, canvas.height);
       }
 
-      if (drawCross) {
-        drawCenterCross(ctx, canvas.width, canvas.height);
-      }
-
       return canvas;
     }
 
     async function resolveImage(imageId, sizeId) {
-      return defaultImageUrl(imageId, sizeId, els.imageExtension.value);
+      const requestedSize = els.sizeId.value === "custom" || els.sizeId.value === "7" ? 6 : sizeId;
+      return defaultImageUrl(imageId, requestedSize, els.imageExtension.value);
+    }
+
+    function getSourceSizeId() {
+      if (els.sizeId.value === "custom" || els.sizeId.value === "7") return 6;
+      return Number(els.sizeId.value);
     }
 
     function getSelectedCardSize() {
-      const sizeId = Number(els.sizeId.value);
+      const rawSizeId = els.sizeId.value;
+      const sizeId = Number(rawSizeId);
 
-      if (sizeId === 4) {
+      if (rawSizeId === "custom" || sizeId === 4) {
         return {
-          width: numberOrDefault(els.size4Width.value, 302),
-          height: numberOrDefault(els.size4Height.value, 454),
-          cm: els.size4Cm.value.trim() || "12.0 x 8.0",
+          width: numberOrDefault(els.size4Width.value, 435),
+          height: numberOrDefault(els.size4Height.value, 548),
+          cm: els.size4Cm.value.trim() || `${els.customHeightCm.value} x ${els.customWidthCm.value}`,
         };
       }
 
@@ -1306,32 +1412,41 @@
       const mode = els.mode.value;
       const isMultiple = ["multiple", "multipleDoble", "multipleDoblePlus"].includes(mode);
       const quantityApplies = ["basica", "basicaDoble", "penta", "pozo"].includes(mode);
+      const isCanvasFull = mode === "canvasFull";
 
       els.multipleOptions.classList.toggle("soft-disabled", !isMultiple);
       els.multipleCount.disabled = !isMultiple;
+      els.canvasFullOptions.classList.toggle("hidden", !isCanvasFull);
 
       els.quantity.disabled = !quantityApplies;
       els.quantity.parentElement.classList.toggle("soft-disabled", !quantityApplies);
+      resetRenderCachesAndRefresh();
     }
 
     function syncSizeOptions() {
-      els.size4Editor.classList.toggle("hidden", Number(els.sizeId.value) !== 4);
-      resetRenderCaches();
+      const isEditableSize = els.sizeId.value === "4" || els.sizeId.value === "custom";
+      els.size4Editor.classList.toggle("hidden", !isEditableSize);
+
+      if (els.sizeId.value === "4") {
+        els.customHeightCm.value = "14.5";
+        els.customWidthCm.value = "11.5";
+        els.customDpi.value = "96";
+        syncCustomCmToPx(false);
+      } else if (els.sizeId.value === "custom") {
+        syncCustomCmToPx(false);
+      }
+
+      resetRenderCachesAndRefresh();
     }
 
     function applySheetPreset() {
       const value = els.sheetPreset.value;
 
-      if (value === "letter-300") {
-        els.sheetWidth.value = 2550;
-        els.sheetHeight.value = 3300;
-      } else if (value === "tabloid-300") {
-        els.sheetWidth.value = 3300;
-        els.sheetHeight.value = 5100;
-      } else if (value === "a4-300") {
-        els.sheetWidth.value = 2480;
-        els.sheetHeight.value = 3508;
-      } else if (value === "") {
+      if (value === "6x1") {
+        els.cardsPerSheet.value = 6;
+        els.columns.value = 6;
+        els.gap.value = 0;
+        els.padding.value = 0;
         els.sheetWidth.value = "";
         els.sheetHeight.value = "";
       }
@@ -1444,6 +1559,76 @@
       });
     }
 
+    async function editCurrentCardCell(event) {
+      if (!state.result) return;
+
+      const canvas = event.currentTarget;
+      const rect = canvas.getBoundingClientRect();
+      const x = ((event.clientX - rect.left) / rect.width) * canvas.width;
+      const y = ((event.clientY - rect.top) / rect.height) * canvas.height;
+      const layout = state.result.layout;
+      const cellW = canvas.width / layout.cols;
+      const cellH = canvas.height / layout.rows;
+      const slotIndex = layout.slots.findIndex((slot) => {
+        const sx = slot.col * cellW;
+        const sy = slot.row * cellH;
+        const sw = slot.w * cellW;
+        const sh = slot.h * cellH;
+        return x >= sx && x <= sx + sw && y >= sy && y <= sy + sh;
+      });
+
+      if (slotIndex < 0) return;
+
+      const slot = layout.slots[slotIndex];
+      if (els.drawCross.checked && !isVisualCrossSlot(slot, layout)) {
+        return;
+      }
+
+      const current = state.result.cards[state.currentIndex][slotIndex];
+      const raw = prompt(`Cambiar foto en posición ${slotIndex + 1}. Número actual: ${current}`, String(current));
+      if (raw === null) return;
+
+      const next = Number(raw.trim());
+      if (!Number.isInteger(next) || next < 1 || next > IMAGE_COUNT) {
+        alert(`Captura un número entero entre 1 y ${IMAGE_COUNT}.`);
+        return;
+      }
+
+      state.result.cards[state.currentIndex][slotIndex] = next;
+      state.currentCache.delete(makeCacheKey(state.currentIndex));
+      state.galleryCache.delete(makeCacheKey(state.currentIndex));
+      state.currentCanvas = null;
+      await renderCurrentCard();
+      await renderGallery();
+    }
+
+    function syncCustomCmToPx(refresh = true) {
+      const hCm = Math.max(0.1, numberOrDefault(els.customHeightCm.value, 14.5));
+      const wCm = Math.max(0.1, numberOrDefault(els.customWidthCm.value, 11.5));
+      const dpi = Math.max(1, numberOrDefault(els.customDpi.value, 96));
+      els.size4Width.value = Math.round((wCm / 2.54) * dpi);
+      els.size4Height.value = Math.round((hCm / 2.54) * dpi);
+      els.size4Cm.value = `${hCm} x ${wCm}`;
+      if (refresh) resetRenderCachesAndRefresh();
+    }
+
+    async function resetRenderCachesAndRefresh() {
+      resetRenderCaches();
+      if (!state.result) return;
+      await renderCurrentCard();
+      await renderGallery();
+    }
+
+    function isVisualCrossSlot(slot, layout) {
+      if (!slot || !layout || layout.type !== "grid") return true;
+      if (layout.cols !== layout.rows) return true;
+
+      // X visual:
+      // 4x4 => posiciones 1,4,6,7,10,11,13,16
+      // 5x5 => posiciones 1,5,7,9,13,17,19,21,25
+      return slot.col === slot.row || slot.col + slot.row === layout.cols - 1;
+    }
+
     function drawCardFrame(ctx, width, height) {
       ctx.save();
       ctx.lineWidth = 2;
@@ -1452,18 +1637,6 @@
       ctx.restore();
     }
 
-    function drawCenterCross(ctx, width, height) {
-      ctx.save();
-      ctx.lineWidth = 1;
-      ctx.strokeStyle = "rgba(190,0,0,0.75)";
-      ctx.beginPath();
-      ctx.moveTo(width / 2, 0);
-      ctx.lineTo(width / 2, height);
-      ctx.moveTo(0, height / 2);
-      ctx.lineTo(width, height / 2);
-      ctx.stroke();
-      ctx.restore();
-    }
 
     function drawCutGuides(ctx, x, y, w, h, { length = 12, offset = 4 } = {}) {
       ctx.save();
@@ -1502,6 +1675,15 @@
     function choosePatternId(activeCorners, rng) {
       const ids = allowedPatternIds(activeCorners);
       return ids[randInt(rng, 0, ids.length - 1)];
+    }
+
+    function choosePatternIdsForGroup(groupSize, activeCorners, rng) {
+      const ids = allowedPatternIds(activeCorners);
+      const out = [];
+      while (out.length < groupSize) {
+        out.push(...shuffle(ids, rng));
+      }
+      return out.slice(0, groupSize);
     }
 
     function imageDeck() {
@@ -1584,15 +1766,35 @@
         els.drawCross.checked ? "cross" : "nocross",
         els.size4Width.value,
         els.size4Height.value,
+        els.customHeightCm?.value,
+        els.customWidthCm?.value,
+        els.customDpi?.value,
       ].join("|");
     }
 
     function makeCardFilename(mode, index) {
-      return `${mode}_${String(index).padStart(3, "0")}.png`;
+      const label = makeCardDisplayName(index - 1).toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "");
+      return `${mode}_${label || String(index).padStart(3, "0")}.jpg`;
     }
 
     function makeSheetFilename(mode, index) {
-      return `${mode}_pliego_${String(index).padStart(3, "0")}.png`;
+      return `${mode}_pliego_${String(index).padStart(3, "0")}.jpg`;
+    }
+
+    function makeCardDisplayName(index) {
+      if (state.result && ["multiple", "multipleDoble", "multipleDoblePlus"].includes(state.result.mode)) {
+        const groupSize = state.result.groupSize || Number(els.multipleCount.value) || 4;
+        const groupIndex = Math.floor(index / groupSize) + 1;
+        const letter = lettersForIndex(index % groupSize);
+        return `Carta ${groupIndex}${letter}`;
+      }
+      return `Carta ${index + 1}`;
+    }
+
+    function lettersForIndex(index) {
+      const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+      if (index < alphabet.length) return alphabet[index];
+      return `_${index + 1}`;
     }
 
     function cloneCanvas(source) {
@@ -1607,7 +1809,7 @@
       canvas.toBlob((blob) => {
         if (!blob) return;
         downloadBlob(blob, filename);
-      }, "image/png");
+      }, "image/jpeg", 0.92);
     }
 
     function canvasToBlob(canvas) {
@@ -1615,7 +1817,7 @@
         canvas.toBlob((blob) => {
           if (blob) resolve(blob);
           else reject(new Error("No se pudo exportar el canvas."));
-        }, "image/png");
+        }, "image/jpeg", 0.92);
       });
     }
 

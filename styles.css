@@ -551,3 +551,28 @@ button:disabled {
     grid-template-columns: 1fr;
   }
 }
+textarea {
+  width: 100%;
+  border: 1px solid #d1d5db;
+  border-radius: 11px;
+  padding: 11px 12px;
+  font-size: 14px;
+  background: #ffffff;
+  color: var(--text);
+  outline: none;
+  resize: vertical;
+  font-family: inherit;
+}
+
+textarea:focus {
+  border-color: #111827;
+  box-shadow: 0 0 0 3px rgba(17, 24, 39, 0.12);
+}
+
+.full-span {
+  grid-column: 1 / -1;
+}
+
+.current-preview canvas {
+  cursor: pointer;
+}
