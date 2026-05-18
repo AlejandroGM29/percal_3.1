@@ -97,6 +97,25 @@
             </select>
           </div>
 
+          <div class="field full-span custom-upload-panel">
+            <div class="custom-upload-header">
+              <div>
+                <label for="customImageUpload">Fotos personalizadas</label>
+                <small id="customImageHelp">Se guardan solo en memoria y aplican únicamente al tamaño seleccionado.</small>
+              </div>
+              <span id="customImageCounter" class="badge badge-neutral">0 extras</span>
+            </div>
+
+            <div class="custom-upload-actions">
+              <input id="customImageUpload" type="file" accept="image/*" multiple />
+              <button id="clearCustomImagesBtn" type="button" class="button-secondary">Quitar extras de este tamaño</button>
+            </div>
+
+            <div id="customImagePreview" class="custom-image-preview">
+              <div class="empty-state">Sin fotos extra para este tamaño.</div>
+            </div>
+          </div>
+
           <div id="multipleOptions" class="field">
             <label for="multipleCount">Cartas función múltiple</label>
             <select id="multipleCount">
@@ -385,6 +404,11 @@
       quantity: document.getElementById("quantity"),
       seed: document.getElementById("seed"),
       imageExtension: document.getElementById("imageExtension"),
+      customImageUpload: document.getElementById("customImageUpload"),
+      clearCustomImagesBtn: document.getElementById("clearCustomImagesBtn"),
+      customImageCounter: document.getElementById("customImageCounter"),
+      customImagePreview: document.getElementById("customImagePreview"),
+      customImageHelp: document.getElementById("customImageHelp"),
       multipleOptions: document.getElementById("multipleOptions"),
       multipleCount: document.getElementById("multipleCount"),
       previewLimit: document.getElementById("previewLimit"),
@@ -450,6 +474,9 @@
       galleryCache: new Map(),
       currentCache: new Map(),
       sheetFiles: [],
+      customImagesBySize: new Map(),
+      customImageSeq: 0,
+      customImageRevision: 0,
     };
 
     document.querySelectorAll(".tab-button").forEach((button) => {
@@ -467,6 +494,8 @@
     });
     els.generateBtn.addEventListener("click", generate);
     els.clearBtn.addEventListener("click", clearAll);
+    els.customImageUpload.addEventListener("change", handleCustomImageUpload);
+    els.clearCustomImagesBtn.addEventListener("click", clearCustomImagesForSelectedSize);
 
     els.photoBtn.addEventListener("click", photoAndNext);
     els.downloadCurrentBtn.addEventListener("click", downloadCurrent);
@@ -593,7 +622,7 @@
             label: labels[mode],
             seed: rng.seed,
             layout: createGridLayout(4, 4),
-            cards: range(1, IMAGE_COUNT).map((doubleId) =>
+            cards: imageDeck().map((doubleId) =>
               generateBasicDoubleCard(rng, activeCorners, doubleId)
             ),
           };
@@ -691,7 +720,7 @@
     }
 
     function generatePentaPlusCards(rng) {
-      return range(1, IMAGE_COUNT).map((centerId) => {
+      return imageDeck().map((centerId) => {
         const card = Array(25).fill(null);
         card[12] = centerId;
         const pool = shuffle(imageDeck().filter((n) => n !== centerId), rng);
@@ -718,7 +747,7 @@
 
     function generateBasicDoubleCard(rng, activeCorners, forcedDoubleId = null) {
       const card = Array(16).fill(null);
-      const doubleId = forcedDoubleId ?? randInt(rng, 1, IMAGE_COUNT);
+      const doubleId = forcedDoubleId ?? randomImageId(rng);
       const patternId = choosePatternId(activeCorners, rng);
       const [a, b] = DOUBLE_PATTERNS[patternId];
 
@@ -814,12 +843,13 @@
     }
 
     function makeMultipleDoublePlusDoubleIds(groupSize, rng) {
-      const totalCards = Math.ceil(IMAGE_COUNT / groupSize) * groupSize;
-      const extraCount = totalCards - IMAGE_COUNT;
+      const deck = imageDeck();
+      const totalCards = Math.ceil(deck.length / groupSize) * groupSize;
+      const extraCount = totalCards - deck.length;
 
       for (let attempt = 0; attempt < 4000; attempt++) {
-        const extras = Array.from({ length: extraCount }, () => randInt(rng, 1, IMAGE_COUNT));
-        const candidate = shuffle([...imageDeck(), ...extras], rng);
+        const extras = Array.from({ length: extraCount }, () => deck[randInt(rng, 0, deck.length - 1)]);
+        const candidate = shuffle([...deck, ...extras], rng);
         let ok = true;
 
         for (let i = 0; i < candidate.length; i += groupSize) {
@@ -902,7 +932,7 @@
 
       els.currentCounter.textContent = `${state.currentIndex + 1} / ${state.result.cards.length}`;
       els.currentSummary.textContent =
-        `${makeCardDisplayName(state.currentIndex)}: ${card.join(", ")}`;
+        `${makeCardDisplayName(state.currentIndex)}: ${card.map(formatCardValue).join(", ")}`;
 
       els.jumpToCard.value = state.currentIndex + 1;
 
@@ -987,7 +1017,7 @@
 
       const numbersBox = document.createElement("div");
       numbersBox.className = "numbers";
-      numbersBox.textContent = numbers.join(", ");
+      numbersBox.textContent = numbers.map(formatCardValue).join(", ");
 
       buttonRow.appendChild(viewBtn);
       buttonRow.appendChild(downloadBtn);
@@ -1384,6 +1414,9 @@
     }
 
     async function resolveImage(imageId, sizeId) {
+      const custom = getCustomImageById(imageId);
+      if (custom) return custom.url;
+
       const requestedSize = els.sizeId.value === "custom" || els.sizeId.value === "7" ? 6 : sizeId;
       return defaultImageUrl(imageId, requestedSize, els.imageExtension.value);
     }
@@ -1436,6 +1469,7 @@
         syncCustomCmToPx(false);
       }
 
+      syncCustomImagePreview();
       resetRenderCachesAndRefresh();
     }
 
@@ -1585,12 +1619,20 @@
       }
 
       const current = state.result.cards[state.currentIndex][slotIndex];
-      const raw = prompt(`Cambiar foto en posición ${slotIndex + 1}. Número actual: ${current}`, String(current));
+      const customOptions = getCustomImagesForSelectedSize();
+      const customHelp = customOptions.length
+        ? `\nExtras: ${customOptions.map((item, index) => `${IMAGE_COUNT + index + 1}=${item.label}`).join(", ")}`
+        : "";
+      const raw = prompt(
+        `Cambiar foto en posición ${slotIndex + 1}. Número actual: ${formatCardValue(current)}${customHelp}`,
+        String(formatCardValue(current))
+      );
       if (raw === null) return;
 
-      const next = Number(raw.trim());
-      if (!Number.isInteger(next) || next < 1 || next > IMAGE_COUNT) {
-        alert(`Captura un número entero entre 1 y ${IMAGE_COUNT}.`);
+      const next = parseImageInput(raw.trim());
+      if (!next) {
+        const max = IMAGE_COUNT + customOptions.length;
+        alert(`Captura un número entero entre 1 y ${max}.`);
         return;
       }
 
@@ -1600,6 +1642,180 @@
       state.currentCanvas = null;
       await renderCurrentCard();
       await renderGallery();
+    }
+
+    function getSelectedSizeMemoryKey() {
+      return String(els.sizeId.value);
+    }
+
+    function getCustomImagesForSelectedSize() {
+      return state.customImagesBySize.get(getSelectedSizeMemoryKey()) || [];
+    }
+
+    function getCustomImageIdsForSelectedSize() {
+      return getCustomImagesForSelectedSize().map((item) => item.id);
+    }
+
+    function getCustomImageById(imageId) {
+      if (typeof imageId !== "string" || !imageId.startsWith("custom:")) return null;
+
+      const [, sizeKey] = imageId.split(":");
+      const items = state.customImagesBySize.get(sizeKey) || [];
+      return items.find((item) => item.id === imageId) || null;
+    }
+
+    function formatCardValue(value) {
+      const custom = getCustomImageById(value);
+      if (custom) return custom.label;
+      return String(value);
+    }
+
+    async function handleCustomImageUpload(event) {
+      const files = Array.from(event.target.files || []).filter((file) => file.type.startsWith("image/"));
+      event.target.value = "";
+
+      if (!files.length) return;
+
+      const sizeKey = getSelectedSizeMemoryKey();
+      const current = state.customImagesBySize.get(sizeKey) || [];
+      const additions = files.map((file) => {
+        state.customImageSeq += 1;
+        const number = IMAGE_COUNT + current.length + state.customImageSeq;
+        return {
+          id: `custom:${sizeKey}:${state.customImageSeq}`,
+          label: `Extra ${current.length + files.indexOf(file) + 1}`,
+          name: file.name,
+          url: URL.createObjectURL(file),
+        };
+      });
+
+      state.customImagesBySize.set(sizeKey, [...current, ...additions]);
+      state.customImageRevision += 1;
+      syncCustomImagePreview();
+      await resetRenderCachesAndRefresh();
+
+      els.status.textContent = `Agregadas ${additions.length} foto(s) extra al tamaño ${els.sizeId.value}. Vuelve a generar para mezclarlas en cartas nuevas.`;
+    }
+
+    async function clearCustomImagesForSelectedSize() {
+      const sizeKey = getSelectedSizeMemoryKey();
+      const items = state.customImagesBySize.get(sizeKey) || [];
+
+      for (const item of items) URL.revokeObjectURL(item.url);
+      state.customImagesBySize.delete(sizeKey);
+      state.customImageRevision += 1;
+
+      syncCustomImagePreview();
+      await removeUnavailableCustomImagesFromCurrentResult(sizeKey);
+      await resetRenderCachesAndRefresh();
+
+      els.status.textContent = `Se quitaron las fotos extra del tamaño ${els.sizeId.value}.`;
+    }
+
+    async function removeUnavailableCustomImagesFromCurrentResult(sizeKey) {
+      if (!state.result) return;
+
+      let changed = false;
+      const fallbackDeck = range(1, IMAGE_COUNT);
+
+      for (const card of state.result.cards) {
+        for (let i = 0; i < card.length; i++) {
+          if (typeof card[i] === "string" && card[i].startsWith(`custom:${sizeKey}:`)) {
+            const options = fallbackDeck.filter((n) => !card.includes(n));
+            card[i] = options.length ? options[0] : fallbackDeck[0];
+            changed = true;
+          }
+        }
+      }
+
+      if (changed) {
+        state.currentCanvas = null;
+      }
+    }
+
+    function syncCustomImagePreview() {
+      const items = getCustomImagesForSelectedSize();
+      const sizeLabel = els.sizeId.value;
+
+      els.customImageHelp.textContent = `Se guardan solo en memoria y aplican únicamente al tamaño ${sizeLabel}.`;
+      els.customImageCounter.textContent = `${items.length} extra${items.length === 1 ? "" : "s"}`;
+      els.clearCustomImagesBtn.disabled = items.length === 0;
+      els.customImagePreview.innerHTML = "";
+
+      if (!items.length) {
+        els.customImagePreview.innerHTML = '<div class="empty-state">Sin fotos extra para este tamaño.</div>';
+        return;
+      }
+
+      for (const item of items) {
+        const card = document.createElement("article");
+        card.className = "custom-image-card";
+
+        const img = document.createElement("img");
+        img.src = item.url;
+        img.alt = item.name;
+
+        const meta = document.createElement("div");
+        meta.className = "custom-image-meta";
+        meta.textContent = `${item.label} · ${item.name}`;
+
+        const removeBtn = document.createElement("button");
+        removeBtn.type = "button";
+        removeBtn.className = "button-secondary button-small";
+        removeBtn.textContent = "Quitar";
+        removeBtn.addEventListener("click", async () => removeCustomImage(item.id));
+
+        card.appendChild(img);
+        card.appendChild(meta);
+        card.appendChild(removeBtn);
+        els.customImagePreview.appendChild(card);
+      }
+    }
+
+    async function removeCustomImage(customImageId) {
+      const [, sizeKey] = customImageId.split(":");
+      const items = state.customImagesBySize.get(sizeKey) || [];
+      const target = items.find((item) => item.id === customImageId);
+      const remaining = items.filter((item) => item.id !== customImageId);
+
+      if (target) URL.revokeObjectURL(target.url);
+
+      if (remaining.length) state.customImagesBySize.set(sizeKey, remaining);
+      else state.customImagesBySize.delete(sizeKey);
+
+      state.customImageRevision += 1;
+      syncCustomImagePreview();
+      await replaceCustomImageInCurrentResult(customImageId);
+      await resetRenderCachesAndRefresh();
+    }
+
+    async function replaceCustomImageInCurrentResult(customImageId) {
+      if (!state.result) return;
+
+      const fallbackDeck = imageDeck().filter((id) => id !== customImageId);
+      let changed = false;
+
+      for (const card of state.result.cards) {
+        for (let i = 0; i < card.length; i++) {
+          if (card[i] === customImageId) {
+            const options = fallbackDeck.filter((id) => !card.includes(id));
+            card[i] = options.length ? options[0] : range(1, IMAGE_COUNT)[0];
+            changed = true;
+          }
+        }
+      }
+
+      if (changed) state.currentCanvas = null;
+    }
+
+    function parseImageInput(value) {
+      const requested = Number(value);
+      if (!Number.isInteger(requested) || requested < 1) return null;
+      if (requested <= IMAGE_COUNT) return requested;
+
+      const customIndex = requested - IMAGE_COUNT - 1;
+      const custom = getCustomImagesForSelectedSize()[customIndex];
+      return custom ? custom.id : null;
     }
 
     function syncCustomCmToPx(refresh = true) {
@@ -1687,7 +1903,12 @@
     }
 
     function imageDeck() {
-      return range(1, IMAGE_COUNT);
+      return [...range(1, IMAGE_COUNT), ...getCustomImageIdsForSelectedSize()];
+    }
+
+    function randomImageId(rng) {
+      const deck = imageDeck();
+      return deck[randInt(rng, 0, deck.length - 1)];
     }
 
     function makeRng(seed = cryptoRandomSeed()) {
@@ -1769,6 +1990,7 @@
         els.customHeightCm?.value,
         els.customWidthCm?.value,
         els.customDpi?.value,
+        state.customImageRevision,
       ].join("|");
     }
 
