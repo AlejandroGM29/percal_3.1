@@ -246,7 +246,10 @@
             <p id="summary">Sin cartas generadas.</p>
           </div>
 
-          <button id="refreshGalleryBtn" class="button-secondary" disabled>Actualizar galería</button>
+          <div class="gallery-toolbar">
+            <button id="rotateAllGalleryBtn" class="button-secondary" disabled>Rotar todo 90°</button>
+            <button id="refreshGalleryBtn" class="button-secondary" disabled>Actualizar galería</button>
+          </div>
         </div>
 
         <div class="gallery-note">
@@ -442,6 +445,7 @@
 
       summary: document.getElementById("summary"),
       previewGrid: document.getElementById("previewGrid"),
+      rotateAllGalleryBtn: document.getElementById("rotateAllGalleryBtn"),
       refreshGalleryBtn: document.getElementById("refreshGalleryBtn"),
 
       zipName: document.getElementById("zipName"),
@@ -474,6 +478,8 @@
       galleryCache: new Map(),
       currentCache: new Map(),
       sheetFiles: [],
+      cardRotations: new Map(),
+      galleryRenderToken: 0,
       customImagesBySize: new Map(),
       customImageSeq: 0,
       customImageRevision: 0,
@@ -503,6 +509,7 @@
     els.nextBtn.addEventListener("click", nextCard);
     els.jumpBtn.addEventListener("click", jumpToCard);
 
+    els.rotateAllGalleryBtn.addEventListener("click", rotateAllCards);
     els.refreshGalleryBtn.addEventListener("click", renderGallery);
     els.downloadIndividualBtn.addEventListener("click", downloadIndividualExport);
 
@@ -532,9 +539,10 @@
 
         state.result = generatePercalLocal(options);
         state.currentIndex = 0;
+        state.cardRotations.clear();
 
         const total = state.result.cards.length;
-        const size = getSelectedCardSize();
+        const size = getRenderSizeForLayout(state.result.layout);
 
         els.status.textContent = `Generadas ${total} carta(s). Renderizando carta actual...`;
         els.summary.textContent =
@@ -935,14 +943,7 @@
       let canvas = state.currentCache.get(cacheKey);
 
       if (!canvas) {
-        canvas = await renderCardToCanvasLocal({
-          card,
-          layout: state.result.layout,
-          size: getSelectedCardSize(),
-          imageResolver: resolveImage,
-          drawCanvasFrame: els.drawCanvasFrame.checked,
-          drawCross: els.drawCross.checked,
-        });
+        canvas = await renderCardCanvasForIndex(state.currentIndex);
 
         state.currentCache.set(cacheKey, canvas);
       }
@@ -967,6 +968,7 @@
     async function renderGallery() {
       if (!state.result) return;
 
+      const renderToken = ++state.galleryRenderToken;
       els.previewGrid.innerHTML = "";
 
       const total = state.result.cards.length;
@@ -983,17 +985,12 @@
         let canvas = state.galleryCache.get(cacheKey);
 
         if (!canvas) {
-          canvas = await renderCardToCanvasLocal({
-            card: state.result.cards[i],
-            layout: state.result.layout,
-            size: getSelectedCardSize(),
-            imageResolver: resolveImage,
-            drawCanvasFrame: els.drawCanvasFrame.checked,
-            drawCross: els.drawCross.checked,
-          });
+          canvas = await renderCardCanvasForIndex(i);
 
           state.galleryCache.set(cacheKey, canvas);
         }
+
+        if (renderToken !== state.galleryRenderToken) return;
 
         appendGalleryCard({
           index: i,
@@ -1004,11 +1001,14 @@
         await waitFrame();
       }
 
+      if (renderToken !== state.galleryRenderToken) return;
       highlightGalleryCard();
       els.status.textContent = "Galería lista.";
     }
 
     function appendGalleryCard({ index, canvas, numbers }) {
+      els.previewGrid.querySelector(`[data-card-index="${index}"]`)?.remove();
+
       const box = document.createElement("article");
       box.className = "gallery-card";
       box.dataset.cardIndex = String(index);
@@ -1032,6 +1032,15 @@
         activateTab("current");
       });
 
+      const rotateBtn = document.createElement("button");
+      rotateBtn.className = "button-secondary button-small";
+      rotateBtn.textContent = "Rotar 90°";
+      rotateBtn.title = `Rotación actual: ${getCardRotation(index)}°`;
+      rotateBtn.addEventListener("click", async (event) => {
+        event.stopPropagation();
+        await rotateCard(index);
+      });
+
       const downloadBtn = document.createElement("button");
       downloadBtn.className = "button-secondary button-small";
       downloadBtn.textContent = "JPG";
@@ -1045,6 +1054,7 @@
       numbersBox.textContent = numbers.map(formatCardValue).join(", ");
 
       buttonRow.appendChild(viewBtn);
+      buttonRow.appendChild(rotateBtn);
       buttonRow.appendChild(downloadBtn);
 
       box.appendChild(title);
@@ -1132,14 +1142,7 @@
         for (let i = 0; i < total; i++) {
           els.exportStatus.textContent = `Renderizando carta ${i + 1} de ${total}...`;
 
-          const canvas = await renderCardToCanvasLocal({
-            card: state.result.cards[i],
-            layout: state.result.layout,
-            size: getSelectedCardSize(),
-            imageResolver: resolveImage,
-            drawCanvasFrame: els.drawCanvasFrame.checked,
-            drawCross: els.drawCross.checked,
-          });
+          const canvas = await renderCardCanvasForIndex(i);
 
           const blob = await canvasToBlob(canvas);
 
@@ -1242,8 +1245,9 @@
 
         const canvas = await renderSheetCanvas({
           cards: groups[i],
+          cardStartIndex: i * options.cardsPerSheet,
           layout: state.result.layout,
-          size: getSelectedCardSize(),
+          size: getRenderSizeForLayout(state.result.layout),
           ...options,
         });
 
@@ -1280,6 +1284,7 @@
       cards,
       layout,
       size,
+      cardStartIndex = 0,
       cardsPerSheet,
       columns,
       gap,
@@ -1338,14 +1343,7 @@
         const x = startX + col * (cardW + gap);
         const y = startY + row * (cardH + gap);
 
-        const cardCanvas = await renderCardToCanvasLocal({
-          card: cards[i],
-          layout,
-          size,
-          imageResolver: resolveImage,
-          drawCanvasFrame: els.drawCanvasFrame.checked,
-          drawCross: els.drawCross.checked,
-        });
+        const cardCanvas = await renderCardCanvasForCard(cards[i], cardStartIndex + i);
 
         ctx.drawImage(cardCanvas, x, y, cardW, cardH);
 
@@ -1378,6 +1376,100 @@
       box.appendChild(button);
 
       els.sheetPreviewGrid.appendChild(box);
+    }
+
+    async function renderCardCanvasForIndex(index) {
+      return renderCardCanvasForCard(state.result.cards[index], index);
+    }
+
+    async function renderCardCanvasForCard(card, index) {
+      const baseCanvas = await renderCardToCanvasLocal({
+        card,
+        layout: state.result.layout,
+        size: getRenderSizeForLayout(state.result.layout),
+        imageResolver: resolveImage,
+        drawCanvasFrame: els.drawCanvasFrame.checked,
+        drawCross: els.drawCross.checked,
+      });
+
+      return rotateCanvas(baseCanvas, getCardRotation(index));
+    }
+
+    function getCardRotation(index) {
+      return state.cardRotations.get(index) || 0;
+    }
+
+    async function rotateCard(index) {
+      state.cardRotations.set(index, (getCardRotation(index) + 90) % 360);
+      state.currentCache.delete(makeCacheKey(index));
+      state.galleryCache.delete(makeCacheKey(index));
+      state.sheetFiles = [];
+
+      if (state.currentIndex === index) state.currentCanvas = null;
+      await renderCurrentCard();
+      await renderGallery();
+    }
+
+    async function rotateAllCards() {
+      if (!state.result) return;
+
+      for (let i = 0; i < state.result.cards.length; i++) {
+        state.cardRotations.set(i, (getCardRotation(i) + 90) % 360);
+      }
+
+      resetRenderCaches();
+      await renderCurrentCard();
+      await renderGallery();
+      els.status.textContent = "Todas las cartas se rotaron 90°. Las descargas usarán esa rotación.";
+    }
+
+    function rotateCanvas(source, rotation = 0) {
+      const normalized = ((rotation % 360) + 360) % 360;
+      if (normalized === 0) return source;
+
+      const canvas = document.createElement("canvas");
+      const swaps = normalized === 90 || normalized === 270;
+      canvas.width = swaps ? source.height : source.width;
+      canvas.height = swaps ? source.width : source.height;
+
+      const ctx = canvas.getContext("2d");
+      if (normalized === 90) {
+        ctx.translate(canvas.width, 0);
+        ctx.rotate(Math.PI / 2);
+      } else if (normalized === 180) {
+        ctx.translate(canvas.width, canvas.height);
+        ctx.rotate(Math.PI);
+      } else if (normalized === 270) {
+        ctx.translate(0, canvas.height);
+        ctx.rotate(-Math.PI / 2);
+      }
+      ctx.drawImage(source, 0, 0);
+      return canvas;
+    }
+
+    function rotatedPointToBasePoint(x, y, baseSize, rotation = 0) {
+      const normalized = ((rotation % 360) + 360) % 360;
+      const w = baseSize.width;
+      const h = baseSize.height;
+
+      if (normalized === 90) return { x: y, y: h - x };
+      if (normalized === 180) return { x: w - x, y: h - y };
+      if (normalized === 270) return { x: w - y, y: x };
+      return { x, y };
+    }
+
+    function getRenderSizeForLayout(layout) {
+      const selected = getSelectedCardSize();
+
+      if (layout?.type === "grid" && layout.cols === 5 && layout.rows === 5) {
+        return {
+          width: Math.round((selected.width / 4) * 5),
+          height: Math.round((selected.height / 4) * 5),
+          cm: selected.cm,
+        };
+      }
+
+      return selected;
     }
 
     async function renderCardToCanvasLocal({
@@ -1516,6 +1608,7 @@
       state.currentIndex = 0;
       state.currentCanvas = null;
       state.sheetFiles = [];
+      state.cardRotations.clear();
 
       clearGeneratedOnly();
 
@@ -1543,6 +1636,7 @@
     }
 
     function resetRenderCaches() {
+      state.galleryRenderToken += 1;
       state.galleryCache.clear();
       state.currentCache.clear();
       state.currentCanvas = null;
@@ -1555,6 +1649,7 @@
       els.previousBtn.disabled = !enabled;
       els.nextBtn.disabled = !enabled;
       els.jumpBtn.disabled = !enabled;
+      els.rotateAllGalleryBtn.disabled = !enabled;
       els.refreshGalleryBtn.disabled = !enabled;
       els.downloadIndividualBtn.disabled = !enabled;
       els.previewSheetsBtn.disabled = !enabled;
@@ -1623,11 +1718,13 @@
 
       const canvas = event.currentTarget;
       const rect = canvas.getBoundingClientRect();
-      const x = ((event.clientX - rect.left) / rect.width) * canvas.width;
-      const y = ((event.clientY - rect.top) / rect.height) * canvas.height;
+      let x = ((event.clientX - rect.left) / rect.width) * canvas.width;
+      let y = ((event.clientY - rect.top) / rect.height) * canvas.height;
       const layout = state.result.layout;
-      const cellW = canvas.width / layout.cols;
-      const cellH = canvas.height / layout.rows;
+      const baseSize = getRenderSizeForLayout(layout);
+      ({ x, y } = rotatedPointToBasePoint(x, y, baseSize, getCardRotation(state.currentIndex)));
+      const cellW = baseSize.width / layout.cols;
+      const cellH = baseSize.height / layout.rows;
       const slotIndex = layout.slots.findIndex((slot) => {
         const sx = slot.col * cellW;
         const sy = slot.row * cellH;
@@ -2020,6 +2117,7 @@
         els.customWidthCm?.value,
         els.customDpi?.value,
         state.customImageRevision,
+        getCardRotation(index),
       ].join("|");
     }
 
