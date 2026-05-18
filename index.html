@@ -101,7 +101,7 @@
             <div class="custom-upload-header">
               <div>
                 <label for="customImageUpload">Fotos personalizadas</label>
-                <small id="customImageHelp">Se guardan solo en memoria y aplican únicamente al tamaño seleccionado.</small>
+                <small id="customImageHelp">Se guardan solo en memoria. Si hay fotos aquí, al generar se usarán solo estas para el tamaño seleccionado.</small>
               </div>
               <span id="customImageCounter" class="badge badge-neutral">0 extras</span>
             </div>
@@ -619,7 +619,7 @@
         case "basicaDoblePlus":
           return {
             mode,
-            label: labels[mode],
+            label: `${labels[mode]} — ${imageDeck().length} carta(s)`,
             seed: rng.seed,
             layout: createGridLayout(4, 4),
             cards: imageDeck().map((doubleId) =>
@@ -683,7 +683,7 @@
         case "pentaPlus":
           return {
             mode,
-            label: `${labels[mode]} — 54 carta(s)`,
+            label: `${labels[mode]} — ${imageDeck().length} carta(s)`,
             seed: rng.seed,
             layout: createGridLayout(5, 5),
             cards: generatePentaPlusCards(rng),
@@ -716,30 +716,48 @@
     }
 
     function generateUniqueCard(cellCount, rng) {
-      return shuffle(imageDeck(), rng).slice(0, cellCount);
+      return drawImagesForSlots(cellCount, rng);
+    }
+
+    function drawImagesForSlots(cellCount, rng, excluded = new Set()) {
+      const fullDeck = imageDeck();
+      let deck = fullDeck.filter((id) => !excluded.has(id));
+      if (!deck.length) deck = fullDeck;
+      if (!deck.length) throw new Error("No hay fotos disponibles para generar la carta.");
+
+      const shuffled = shuffle(deck, rng);
+      if (shuffled.length >= cellCount) return shuffled.slice(0, cellCount);
+
+      const out = [...shuffled];
+      while (out.length < cellCount) {
+        out.push(deck[randInt(rng, 0, deck.length - 1)]);
+      }
+      return out;
     }
 
     function generatePentaPlusCards(rng) {
       return imageDeck().map((centerId) => {
         const card = Array(25).fill(null);
         card[12] = centerId;
-        const pool = shuffle(imageDeck().filter((n) => n !== centerId), rng);
+        const fill = drawImagesForSlots(24, rng, new Set([centerId]));
         let p = 0;
         for (let i = 0; i < card.length; i++) {
-          if (card[i] === null) card[i] = pool[p++];
+          if (card[i] === null) card[i] = fill[p++];
         }
         return card;
       });
     }
 
     function parseCanvasFullNumbers(value) {
+      const deck = imageDeck();
       const values = String(value || "")
         .split(/[,\n;\s]+/)
         .map((x) => Number(x.trim()))
-        .filter((n) => Number.isInteger(n) && n >= 1 && n <= IMAGE_COUNT);
+        .filter((n) => Number.isInteger(n) && n >= 1 && n <= deck.length)
+        .map((n) => deck[n - 1]);
 
       if (!values.length) {
-        throw new Error("Canvas full necesita números entre 1 y 54 separados por coma.");
+        throw new Error(`Canvas full necesita números entre 1 y ${deck.length} separados por coma.`);
       }
 
       return values;
@@ -754,7 +772,7 @@
       card[a] = doubleId;
       card[b] = doubleId;
 
-      const pool = shuffle(imageDeck().filter((n) => n !== doubleId), rng);
+      const pool = drawImagesForSlots(card.filter((value) => value === null).length, rng, new Set([doubleId]));
       let p = 0;
 
       for (let i = 0; i < card.length; i++) {
@@ -777,7 +795,7 @@
       let doubleIds = [];
 
       if (doubleMode) {
-        doubleIds = forcedDoubleIds || shuffle(imageDeck(), rng).slice(0, groupSize);
+        doubleIds = forcedDoubleIds || drawImagesForSlots(groupSize, rng);
 
         const patternIds = choosePatternIdsForGroup(groupSize, activeCorners, rng);
 
@@ -790,7 +808,7 @@
       }
 
       const availableBase = imageDeck().filter((n) => !doubleIds.includes(n));
-      const basePool = shuffle(availableBase, rng);
+      const basePool = shuffle(availableBase.length ? availableBase : imageDeck(), rng);
       const emptyCells = [];
 
       cards.forEach((card, cardIndex) => {
@@ -813,7 +831,8 @@
         for (let i = 0; i < card.length; i++) {
           if (card[i] === null) {
             const options = imageDeck().filter((n) => !card.includes(n));
-            card[i] = options[randInt(rng, 0, options.length - 1)];
+            const pool = options.length ? options : imageDeck();
+            card[i] = pool[randInt(rng, 0, pool.length - 1)];
           }
         }
       }
@@ -844,6 +863,12 @@
 
     function makeMultipleDoublePlusDoubleIds(groupSize, rng) {
       const deck = imageDeck();
+      if (!deck.length) throw new Error("No hay fotos disponibles para generar Multiple doble plus.");
+
+      if (deck.length < groupSize) {
+        return Array.from({ length: groupSize }, () => deck[randInt(rng, 0, deck.length - 1)]);
+      }
+
       const totalCards = Math.ceil(deck.length / groupSize) * groupSize;
       const extraCount = totalCards - deck.length;
 
@@ -1619,20 +1644,20 @@
       }
 
       const current = state.result.cards[state.currentIndex][slotIndex];
+      const deck = imageDeck();
       const customOptions = getCustomImagesForSelectedSize();
       const customHelp = customOptions.length
-        ? `\nExtras: ${customOptions.map((item, index) => `${IMAGE_COUNT + index + 1}=${item.label}`).join(", ")}`
+        ? `\nFotos activas: ${customOptions.map((item, index) => `${index + 1}=${item.label}`).join(", ")}`
         : "";
       const raw = prompt(
         `Cambiar foto en posición ${slotIndex + 1}. Número actual: ${formatCardValue(current)}${customHelp}`,
-        String(formatCardValue(current))
+        String(deckIndexForValue(current))
       );
       if (raw === null) return;
 
       const next = parseImageInput(raw.trim());
       if (!next) {
-        const max = IMAGE_COUNT + customOptions.length;
-        alert(`Captura un número entero entre 1 y ${max}.`);
+        alert(`Captura un número entero entre 1 y ${deck.length}.`);
         return;
       }
 
@@ -1694,7 +1719,7 @@
       syncCustomImagePreview();
       await resetRenderCachesAndRefresh();
 
-      els.status.textContent = `Agregadas ${additions.length} foto(s) extra al tamaño ${els.sizeId.value}. Vuelve a generar para mezclarlas en cartas nuevas.`;
+      els.status.textContent = `Agregadas ${additions.length} foto(s) personalizada(s) al tamaño ${els.sizeId.value}. Al generar, se usarán solo estas fotos para ese tamaño.`;
     }
 
     async function clearCustomImagesForSelectedSize() {
@@ -1737,7 +1762,7 @@
       const items = getCustomImagesForSelectedSize();
       const sizeLabel = els.sizeId.value;
 
-      els.customImageHelp.textContent = `Se guardan solo en memoria y aplican únicamente al tamaño ${sizeLabel}.`;
+      els.customImageHelp.textContent = `Se guardan solo en memoria. Si hay fotos aquí, al generar se usarán solo estas para el tamaño ${sizeLabel}.`;
       els.customImageCounter.textContent = `${items.length} extra${items.length === 1 ? "" : "s"}`;
       els.clearCustomImagesBtn.disabled = items.length === 0;
       els.customImagePreview.innerHTML = "";
@@ -1799,7 +1824,8 @@
         for (let i = 0; i < card.length; i++) {
           if (card[i] === customImageId) {
             const options = fallbackDeck.filter((id) => !card.includes(id));
-            card[i] = options.length ? options[0] : range(1, IMAGE_COUNT)[0];
+            const fallback = imageDeck();
+            card[i] = options.length ? options[0] : fallback[0];
             changed = true;
           }
         }
@@ -1810,12 +1836,9 @@
 
     function parseImageInput(value) {
       const requested = Number(value);
-      if (!Number.isInteger(requested) || requested < 1) return null;
-      if (requested <= IMAGE_COUNT) return requested;
-
-      const customIndex = requested - IMAGE_COUNT - 1;
-      const custom = getCustomImagesForSelectedSize()[customIndex];
-      return custom ? custom.id : null;
+      const deck = imageDeck();
+      if (!Number.isInteger(requested) || requested < 1 || requested > deck.length) return null;
+      return deck[requested - 1];
     }
 
     function syncCustomCmToPx(refresh = true) {
@@ -1903,7 +1926,13 @@
     }
 
     function imageDeck() {
-      return [...range(1, IMAGE_COUNT), ...getCustomImageIdsForSelectedSize()];
+      const customIds = getCustomImageIdsForSelectedSize();
+      return customIds.length ? customIds : range(1, IMAGE_COUNT);
+    }
+
+    function deckIndexForValue(value) {
+      const index = imageDeck().findIndex((item) => item === value);
+      return index >= 0 ? index + 1 : formatCardValue(value);
     }
 
     function randomImageId(rng) {
