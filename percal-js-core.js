@@ -21,9 +21,10 @@ export const CARD_SIZES = {
   1: { width: 212, height: 360, cm: "9.5 x 5.6" },
   2: { width: 272, height: 367, cm: "9.7 x 7.2" },
   3: { width: 316, height: 396, cm: "10.5 x 8.4" },
-  4: { width: 302, height: 454, cm: "12.0 x 8.0" },
+  4: { width: 435, height: 548, cm: "14.5 x 11.5" },
   5: { width: 332, height: 516, cm: "13.7 x 8.6" },
   6: { width: 436, height: 700, cm: "18.5 x 11.5" },
+  7: { width: 624, height: 1002, cm: "26.5 x 16.5" },
 };
 
 // Rutas configurables por tamaño.
@@ -389,7 +390,7 @@ export function defaultImageUrl(imageId, sizeId, extension = "jpg") {
     throw new Error(`Tamaño no configurado: ${sizeId}`);
   }
 
-  const sizesWithoutLeadingZero = [2, 3];
+  const sizesWithoutLeadingZero = [2, 3, 4];
   const fileNumber = sizesWithoutLeadingZero.includes(Number(sizeId))
     ? String(imageId)
     : String(imageId).padStart(2, "0");

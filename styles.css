@@ -398,8 +398,13 @@ button:disabled {
 
 .preview-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(165px, 1fr));
-  gap: 16px;
+  grid-template-columns: repeat(8, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.gallery-name-row {
+  max-width: 520px;
+  margin-bottom: 16px;
 }
 
 .gallery-card {
@@ -429,6 +434,15 @@ button:disabled {
   border-radius: 9px;
   background: #ffffff;
   border: 1px solid var(--line);
+}
+
+.current-preview canvas {
+  cursor: grab;
+  touch-action: none;
+}
+
+.current-preview canvas:active {
+  cursor: grabbing;
 }
 
 .gallery-card-title {
@@ -484,6 +498,10 @@ button:disabled {
 }
 
 @media (max-width: 1120px) {
+  .preview-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
   .form-grid,
   .form-grid.compact {
     grid-template-columns: repeat(2, minmax(170px, 1fr));
@@ -549,6 +567,10 @@ button:disabled {
 
   .sheet-preview-grid {
     grid-template-columns: 1fr;
+  }
+
+  .preview-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 textarea {

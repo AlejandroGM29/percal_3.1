@@ -127,17 +127,31 @@
             </select>
           </div>
 
+          <div id="multipleGroupsOptions" class="field">
+            <label for="multipleGroupCount">Cantidad de grupos</label>
+            <input id="multipleGroupCount" type="number" value="1" min="1" max="100" />
+            <small>Ej. 4 grupos de 4: 1A–1D, 2A–2D, 3A–3D y 4A–4D.</small>
+          </div>
+
           <div class="field">
             <label for="previewLimit">Límite de galería</label>
-            <input id="previewLimit" type="number" value="40" min="1" />
+            <input id="previewLimit" type="number" value="56" min="1" />
             <small>Evita páginas enormes cuando se generan muchas cartas.</small>
           </div>
 
           <div class="field checkbox-field">
             <label>Patrones</label>
             <label class="check-row">
-              <input id="activeCorners" type="checkbox" />
-              <span>Activar esquinas</span>
+              <input id="patternDiagonals" type="checkbox" checked />
+              <span>Diagonales</span>
+            </label>
+            <label class="check-row">
+              <input id="patternHorizontal" type="checkbox" checked />
+              <span>Acostadas</span>
+            </label>
+            <label class="check-row">
+              <input id="patternCorners" type="checkbox" />
+              <span>Esquinas</span>
             </label>
           </div>
 
@@ -247,8 +261,17 @@
           </div>
 
           <div class="gallery-toolbar">
+            <button id="rotatePairsGalleryBtn" class="button-secondary" disabled>Rotar 2 sí / 2 no</button>
             <button id="rotateAllGalleryBtn" class="button-secondary" disabled>Rotar todo 90°</button>
             <button id="refreshGalleryBtn" class="button-secondary" disabled>Actualizar galería</button>
+          </div>
+        </div>
+
+        <div class="gallery-name-row">
+          <div class="field">
+            <label for="cardNameGallery">Nombre global</label>
+            <input id="cardNameGallery" type="text" value="Carta" placeholder="Ej. PedidoAZUL" />
+            <small>Los títulos y archivos usan este nombre seguido del ID: Carta1A, PedidoAZUL2C…</small>
           </div>
         </div>
 
@@ -272,6 +295,12 @@
         </div>
 
         <div class="form-grid">
+          <div class="field">
+            <label for="cardNameExport">Nombre de las cartas</label>
+            <input id="cardNameExport" type="text" value="Carta" placeholder="Ej. PedidoAZUL" />
+            <small>Es el mismo nombre global configurado en Galería.</small>
+          </div>
+
           <div class="field">
             <label for="zipName">Nombre ZIP</label>
             <input id="zipName" type="text" placeholder="percal_export.zip" />
@@ -414,8 +443,12 @@
       customImageHelp: document.getElementById("customImageHelp"),
       multipleOptions: document.getElementById("multipleOptions"),
       multipleCount: document.getElementById("multipleCount"),
+      multipleGroupsOptions: document.getElementById("multipleGroupsOptions"),
+      multipleGroupCount: document.getElementById("multipleGroupCount"),
       previewLimit: document.getElementById("previewLimit"),
-      activeCorners: document.getElementById("activeCorners"),
+      patternDiagonals: document.getElementById("patternDiagonals"),
+      patternHorizontal: document.getElementById("patternHorizontal"),
+      patternCorners: document.getElementById("patternCorners"),
       drawCanvasFrame: document.getElementById("drawCanvasFrame"),
       drawCross: document.getElementById("drawCross"),
       canvasFullOptions: document.getElementById("canvasFullOptions"),
@@ -445,11 +478,14 @@
 
       summary: document.getElementById("summary"),
       previewGrid: document.getElementById("previewGrid"),
+      rotatePairsGalleryBtn: document.getElementById("rotatePairsGalleryBtn"),
       rotateAllGalleryBtn: document.getElementById("rotateAllGalleryBtn"),
       refreshGalleryBtn: document.getElementById("refreshGalleryBtn"),
+      cardNameGallery: document.getElementById("cardNameGallery"),
 
       zipName: document.getElementById("zipName"),
       folderName: document.getElementById("folderName"),
+      cardNameExport: document.getElementById("cardNameExport"),
       downloadIndividualBtn: document.getElementById("downloadIndividualBtn"),
       exportStatus: document.getElementById("exportStatus"),
 
@@ -483,15 +519,17 @@
       customImagesBySize: new Map(),
       customImageSeq: 0,
       customImageRevision: 0,
+      dragSourceSlot: null,
+      suppressNextCanvasClick: false,
     };
 
     document.querySelectorAll(".tab-button").forEach((button) => {
       button.addEventListener("click", () => activateTab(button.dataset.tab));
     });
 
-    els.mode.addEventListener("change", syncModeOptions);
-    els.sizeId.addEventListener("change", syncSizeOptions);
-    [els.activeCorners, els.drawCross, els.imageExtension, els.size4Width, els.size4Height].forEach((el) => {
+    els.mode.addEventListener("change", () => syncModeOptions(true));
+    els.sizeId.addEventListener("change", () => syncSizeOptions(true, true));
+    [els.patternDiagonals, els.patternHorizontal, els.patternCorners, els.drawCross, els.imageExtension, els.size4Width, els.size4Height].forEach((el) => {
       el?.addEventListener("change", resetRenderCachesAndRefresh);
       el?.addEventListener("input", resetRenderCachesAndRefresh);
     });
@@ -509,16 +547,19 @@
     els.nextBtn.addEventListener("click", nextCard);
     els.jumpBtn.addEventListener("click", jumpToCard);
 
+    els.rotatePairsGalleryBtn.addEventListener("click", rotateTwoOnTwoOff);
     els.rotateAllGalleryBtn.addEventListener("click", rotateAllCards);
     els.refreshGalleryBtn.addEventListener("click", renderGallery);
     els.downloadIndividualBtn.addEventListener("click", downloadIndividualExport);
+    els.cardNameGallery.addEventListener("input", () => syncCardName(els.cardNameGallery));
+    els.cardNameExport.addEventListener("input", () => syncCardName(els.cardNameExport));
 
     els.sheetPreset.addEventListener("change", applySheetPreset);
     els.previewSheetsBtn.addEventListener("click", previewSheets);
     els.downloadSheetsBtn.addEventListener("click", downloadSheetsExport);
 
-    syncModeOptions();
-    syncSizeOptions();
+    syncModeOptions(false);
+    syncSizeOptions(false, true);
 
     function activateTab(tabName) {
       document.querySelectorAll(".tab-button").forEach((button) => {
@@ -557,7 +598,7 @@
         await renderGallery();
 
         els.status.textContent = `Listo. ${total} carta(s) generadas.`;
-        activateTab("current");
+        activateTab("gallery");
       } catch (error) {
         console.error(error);
         els.status.textContent = `Error: ${error.message}`;
@@ -576,8 +617,9 @@
         sizeId: Number(els.sizeId.value),
         quantity: Math.max(1, numberOrDefault(els.quantity.value, 1)),
         seed: seedValue === "" ? undefined : Number(seedValue),
-        activeCorners: els.activeCorners.checked,
+        activePatterns: getSelectedPatternTypes(),
         multipleCount: Number(els.multipleCount.value),
+        multipleGroupCount: Math.max(1, numberOrDefault(els.multipleGroupCount.value, 1)),
       };
     }
 
@@ -585,8 +627,9 @@
       mode,
       seed,
       quantity = 1,
-      activeCorners = false,
+      activePatterns = ["diagonal", "horizontal"],
       multipleCount = 4,
+      multipleGroupCount = 1,
     }) {
       const rng = makeRng(seed);
 
@@ -620,7 +663,7 @@
             seed: rng.seed,
             layout: createGridLayout(4, 4),
             cards: Array.from({ length: quantity }, () =>
-              generateBasicDoubleCard(rng, activeCorners)
+              generateBasicDoubleCard(rng, activePatterns)
             ),
           };
 
@@ -631,38 +674,38 @@
             seed: rng.seed,
             layout: createGridLayout(4, 4),
             cards: imageDeck().map((doubleId) =>
-              generateBasicDoubleCard(rng, activeCorners, doubleId)
+              generateBasicDoubleCard(rng, activePatterns, doubleId)
             ),
           };
 
         case "multiple":
           return {
             mode,
-            label: `${labels[mode]} — ${multipleCount} carta(s)`,
+            label: `${labels[mode]} — ${multipleGroupCount} grupo(s) de ${multipleCount}`,
             seed: rng.seed,
             layout: createGridLayout(4, 4),
             groupSize: multipleCount,
-            cards: generateMultipleGroup({
+            cards: Array.from({ length: multipleGroupCount }, () => generateMultipleGroup({
               groupSize: multipleCount,
               rng,
               doubleMode: false,
-              activeCorners,
-            }),
+              activePatterns,
+            })).flat(),
           };
 
         case "multipleDoble":
           return {
             mode,
-            label: `${labels[mode]} — ${multipleCount} carta(s)`,
+            label: `${labels[mode]} — ${multipleGroupCount} grupo(s) de ${multipleCount}`,
             seed: rng.seed,
             layout: createGridLayout(4, 4),
             groupSize: multipleCount,
-            cards: generateMultipleGroup({
+            cards: Array.from({ length: multipleGroupCount }, () => generateMultipleGroup({
               groupSize: multipleCount,
               rng,
               doubleMode: true,
-              activeCorners,
-            }),
+              activePatterns,
+            })).flat(),
           };
 
         case "multipleDoblePlus":
@@ -675,7 +718,7 @@
             cards: generateMultipleDoublePlus({
               groupSize: multipleCount,
               rng,
-              activeCorners,
+              activePatterns,
             }),
           };
 
@@ -771,10 +814,10 @@
       return values;
     }
 
-    function generateBasicDoubleCard(rng, activeCorners, forcedDoubleId = null) {
+    function generateBasicDoubleCard(rng, activePatterns, forcedDoubleId = null) {
       const card = Array(16).fill(null);
       const doubleId = forcedDoubleId ?? randomImageId(rng);
-      const patternId = choosePatternId(activeCorners, rng);
+      const patternId = choosePatternId(activePatterns, rng);
       const [a, b] = DOUBLE_PATTERNS[patternId];
 
       card[a] = doubleId;
@@ -796,7 +839,7 @@
       groupSize,
       rng,
       doubleMode = false,
-      activeCorners = false,
+      activePatterns = ["diagonal", "horizontal"],
       forcedDoubleIds = null,
     }) {
       const cards = Array.from({ length: groupSize }, () => Array(16).fill(null));
@@ -805,7 +848,7 @@
       if (doubleMode) {
         doubleIds = forcedDoubleIds || drawImagesForSlots(groupSize, rng);
 
-        const patternIds = choosePatternIdsForGroup(groupSize, activeCorners, rng);
+        const patternIds = choosePatternIdsForGroup(groupSize, activePatterns, rng);
 
         cards.forEach((card, index) => {
           const patternId = patternIds[index];
@@ -848,7 +891,7 @@
       return cards;
     }
 
-    function generateMultipleDoublePlus({ groupSize, rng, activeCorners }) {
+    function generateMultipleDoublePlus({ groupSize, rng, activePatterns }) {
       const doubleIds = makeMultipleDoublePlusDoubleIds(groupSize, rng);
       const cards = [];
 
@@ -860,7 +903,7 @@
             groupSize,
             rng,
             doubleMode: true,
-            activeCorners,
+            activePatterns,
             forcedDoubleIds: groupDoubleIds,
           })
         );
@@ -952,8 +995,11 @@
 
       els.currentPreview.innerHTML = "";
       const currentClone = cloneCanvas(canvas);
-      currentClone.title = "Clic en una foto para cambiar su número";
+      currentClone.title = "Arrastra una foto para reordenarla; haz clic para cambiar su número";
       currentClone.addEventListener("click", editCurrentCardCell);
+      currentClone.addEventListener("pointerdown", beginCardImageDrag);
+      currentClone.addEventListener("pointerup", finishCardImageDrag);
+      currentClone.addEventListener("pointercancel", cancelCardImageDrag);
       els.currentPreview.appendChild(currentClone);
 
       els.currentCounter.textContent = `${state.currentIndex + 1} / ${state.result.cards.length}`;
@@ -972,7 +1018,7 @@
       els.previewGrid.innerHTML = "";
 
       const total = state.result.cards.length;
-      const previewLimit = Math.max(1, numberOrDefault(els.previewLimit.value, 40));
+      const previewLimit = Math.max(1, numberOrDefault(els.previewLimit.value, 56));
       const renderCount = Math.min(total, previewLimit);
 
       els.summary.textContent =
@@ -1007,7 +1053,7 @@
     }
 
     function appendGalleryCard({ index, canvas, numbers }) {
-      els.previewGrid.querySelector(`[data-card-index="${index}"]`)?.remove();
+      const existing = els.previewGrid.querySelector(`[data-card-index="${index}"]`);
 
       const box = document.createElement("article");
       box.className = "gallery-card";
@@ -1068,7 +1114,8 @@
         activateTab("current");
       });
 
-      els.previewGrid.appendChild(box);
+      if (existing) existing.replaceWith(box);
+      else els.previewGrid.appendChild(box);
     }
 
     function highlightGalleryCard() {
@@ -1405,9 +1452,38 @@
       state.galleryCache.delete(makeCacheKey(index));
       state.sheetFiles = [];
 
-      if (state.currentIndex === index) state.currentCanvas = null;
-      await renderCurrentCard();
-      await renderGallery();
+      if (state.currentIndex === index) {
+        state.currentCanvas = null;
+        await renderCurrentCard();
+      }
+      await refreshGalleryCard(index);
+      els.status.textContent = `${makeCardDisplayName(index)} se rotó 90°. Las descargas conservarán la rotación.`;
+    }
+
+    async function refreshGalleryCard(index) {
+      const existing = els.previewGrid.querySelector(`[data-card-index="${index}"]`);
+      if (!existing) return;
+      const canvas = await renderCardCanvasForIndex(index);
+      state.galleryCache.set(makeCacheKey(index), canvas);
+      appendGalleryCard({ index, canvas, numbers: state.result.cards[index] });
+      highlightGalleryCard();
+    }
+
+    async function rotateTwoOnTwoOff() {
+      if (!state.result) return;
+      const pairIsAlreadyRotated = state.result.cards.some(
+        (_, index) => index % 4 >= 2 && getCardRotation(index) === 90
+      );
+
+      for (let i = 0; i < state.result.cards.length; i++) {
+        state.cardRotations.set(i, !pairIsAlreadyRotated && i % 4 >= 2 ? 90 : 0);
+      }
+
+      await refreshAllRotatedCards(
+        pairIsAlreadyRotated
+          ? "Se quitaron las rotaciones 2 sí / 2 no."
+          : "Rotación 2 sí / 2 no aplicada a todos los grupos."
+      );
     }
 
     async function rotateAllCards() {
@@ -1417,10 +1493,17 @@
         state.cardRotations.set(i, (getCardRotation(i) + 90) % 360);
       }
 
+      await refreshAllRotatedCards("Todas las cartas se rotaron 90°. Las descargas usarán esa rotación.");
+    }
+
+    async function refreshAllRotatedCards(message) {
+      const scrollX = window.scrollX;
+      const scrollY = window.scrollY;
       resetRenderCaches();
       await renderCurrentCard();
       await renderGallery();
-      els.status.textContent = "Todas las cartas se rotaron 90°. Las descargas usarán esa rotación.";
+      window.scrollTo(scrollX, scrollY);
+      els.status.textContent = message;
     }
 
     function rotateCanvas(source, rotation = 0) {
@@ -1507,10 +1590,12 @@
 
         const img = await loadImage(await imageResolver(imageId, getSourceSizeId(), i));
 
-        const x = slot.col * cellW;
-        const y = slot.row * cellH;
-        const w = slot.w * cellW;
-        const h = slot.h * cellH;
+        const x = Math.round(slot.col * cellW);
+        const y = Math.round(slot.row * cellH);
+        const right = Math.round((slot.col + slot.w) * cellW);
+        const bottom = Math.round((slot.row + slot.h) * cellH);
+        const w = right - x;
+        const h = bottom - y;
 
         ctx.drawImage(img, x, y, w, h);
 
@@ -1558,26 +1643,29 @@
       return CARD_SIZES[sizeId];
     }
 
-    function syncModeOptions() {
+    function syncModeOptions(refresh = true) {
       const mode = els.mode.value;
       const isMultiple = ["multiple", "multipleDoble", "multipleDoblePlus"].includes(mode);
+      const supportsGroupCount = ["multiple", "multipleDoble"].includes(mode);
       const quantityApplies = ["basica", "basicaDoble", "penta", "pozo"].includes(mode);
       const isCanvasFull = mode === "canvasFull";
 
       els.multipleOptions.classList.toggle("soft-disabled", !isMultiple);
       els.multipleCount.disabled = !isMultiple;
+      els.multipleGroupsOptions.classList.toggle("soft-disabled", !supportsGroupCount);
+      els.multipleGroupCount.disabled = !supportsGroupCount;
       els.canvasFullOptions.classList.toggle("hidden", !isCanvasFull);
 
       els.quantity.disabled = !quantityApplies;
       els.quantity.parentElement.classList.toggle("soft-disabled", !quantityApplies);
-      resetRenderCachesAndRefresh();
+      if (refresh) resetRenderCachesAndRefresh();
     }
 
-    function syncSizeOptions() {
+    function syncSizeOptions(refresh = true, resetPreset = false) {
       const isEditableSize = els.sizeId.value === "4" || els.sizeId.value === "custom";
       els.size4Editor.classList.toggle("hidden", !isEditableSize);
 
-      if (els.sizeId.value === "4") {
+      if (els.sizeId.value === "4" && resetPreset) {
         els.customHeightCm.value = "14.5";
         els.customWidthCm.value = "11.5";
         els.customDpi.value = "96";
@@ -1587,7 +1675,7 @@
       }
 
       syncCustomImagePreview();
-      resetRenderCachesAndRefresh();
+      if (refresh) resetRenderCachesAndRefresh();
     }
 
     function applySheetPreset() {
@@ -1649,6 +1737,7 @@
       els.previousBtn.disabled = !enabled;
       els.nextBtn.disabled = !enabled;
       els.jumpBtn.disabled = !enabled;
+      els.rotatePairsGalleryBtn.disabled = !enabled;
       els.rotateAllGalleryBtn.disabled = !enabled;
       els.refreshGalleryBtn.disabled = !enabled;
       els.downloadIndividualBtn.disabled = !enabled;
@@ -1663,8 +1752,8 @@
       });
 
       if (!isBusy) {
-        syncModeOptions();
-        syncSizeOptions();
+        syncModeOptions(false);
+        syncSizeOptions(false);
 
         if (state.result) {
           enableAfterGenerate(true);
@@ -1713,8 +1802,61 @@
       });
     }
 
+    function getCardSlotAtPointer(event, canvas) {
+      const rect = canvas.getBoundingClientRect();
+      let x = ((event.clientX - rect.left) / rect.width) * canvas.width;
+      let y = ((event.clientY - rect.top) / rect.height) * canvas.height;
+      const layout = state.result.layout;
+      const baseSize = getRenderSizeForLayout(layout);
+      ({ x, y } = rotatedPointToBasePoint(x, y, baseSize, getCardRotation(state.currentIndex)));
+      const cellW = baseSize.width / layout.cols;
+      const cellH = baseSize.height / layout.rows;
+
+      return layout.slots.findIndex((slot) => {
+        const sx = slot.col * cellW;
+        const sy = slot.row * cellH;
+        return x >= sx && x <= sx + slot.w * cellW && y >= sy && y <= sy + slot.h * cellH;
+      });
+    }
+
+    function beginCardImageDrag(event) {
+      if (!state.result) return;
+      state.dragSourceSlot = getCardSlotAtPointer(event, event.currentTarget);
+      if (state.dragSourceSlot >= 0) event.currentTarget.setPointerCapture?.(event.pointerId);
+    }
+
+    function cancelCardImageDrag() {
+      state.dragSourceSlot = null;
+    }
+
+    async function finishCardImageDrag(event) {
+      const source = state.dragSourceSlot;
+      state.dragSourceSlot = null;
+      if (source === null || source < 0) return;
+
+      const target = getCardSlotAtPointer(event, event.currentTarget);
+      if (target < 0 || target === source) return;
+
+      state.suppressNextCanvasClick = true;
+      const card = state.result.cards[state.currentIndex];
+      const [moved] = card.splice(source, 1);
+      card.splice(target, 0, moved);
+      state.currentCache.delete(makeCacheKey(state.currentIndex));
+      state.galleryCache.delete(makeCacheKey(state.currentIndex));
+      state.currentCanvas = null;
+      state.sheetFiles = [];
+      await renderCurrentCard();
+      await refreshGalleryCard(state.currentIndex);
+      els.status.textContent = `Imagen movida de la posición ${source + 1} a la ${target + 1}.`;
+    }
+
     async function editCurrentCardCell(event) {
       if (!state.result) return;
+
+      if (state.suppressNextCanvasClick) {
+        state.suppressNextCanvasClick = false;
+        return;
+      }
 
       const canvas = event.currentTarget;
       const rect = canvas.getBoundingClientRect();
@@ -2004,22 +2146,44 @@
       ctx.restore();
     }
 
-    function allowedPatternIds(activeCorners) {
-      return activeCorners ? [0, 1, 2, 3, 4] : [2, 3, 4];
+    function getSelectedPatternTypes() {
+      const selected = [];
+      if (els.patternDiagonals.checked) selected.push("diagonal");
+      if (els.patternHorizontal.checked) selected.push("horizontal");
+      if (els.patternCorners.checked) selected.push("corners");
+      if (!selected.length) throw new Error("Selecciona al menos un patrón de dobles.");
+      return selected;
     }
 
-    function choosePatternId(activeCorners, rng) {
-      const ids = allowedPatternIds(activeCorners);
+    function patternIdsForType(type) {
+      if (type === "corners") return [0, 1];
+      if (type === "horizontal") return [2];
+      return [3, 4];
+    }
+
+    function choosePatternId(activePatterns, rng) {
+      const ids = activePatterns.flatMap(patternIdsForType);
       return ids[randInt(rng, 0, ids.length - 1)];
     }
 
-    function choosePatternIdsForGroup(groupSize, activeCorners, rng) {
-      const ids = allowedPatternIds(activeCorners);
+    function choosePatternIdsForGroup(groupSize, activePatterns, rng) {
+      const types = shuffle(activePatterns, rng);
       const out = [];
-      while (out.length < groupSize) {
-        out.push(...shuffle(ids, rng));
+      const diagonalIds = rng() < 0.5 ? [3, 4] : [4, 3];
+      let diagonalIndex = 0;
+
+      for (let i = 0; i < groupSize; i++) {
+        const type = types[i % types.length];
+        if (type === "diagonal") {
+          out.push(diagonalIds[diagonalIndex % diagonalIds.length]);
+          diagonalIndex += 1;
+        } else {
+          const ids = patternIdsForType(type);
+          out.push(ids[randInt(rng, 0, ids.length - 1)]);
+        }
       }
-      return out.slice(0, groupSize);
+
+      return shuffle(out, rng);
     }
 
     function imageDeck() {
@@ -2121,23 +2285,48 @@
       ].join("|");
     }
 
-    function makeCardFilename(mode, index) {
-      const label = makeCardDisplayName(index - 1).toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "");
-      return `${mode}_${label || String(index).padStart(3, "0")}.jpg`;
+    function makeCardFilename(_mode, index) {
+      return `${safeFilenamePart(makeCardDisplayName(index - 1))}.jpg`;
     }
 
-    function makeSheetFilename(mode, index) {
-      return `${mode}_pliego_${String(index).padStart(3, "0")}.jpg`;
+    function makeSheetFilename(_mode, index) {
+      return `${safeFilenamePart(getCardBaseName())}Pliego${String(index).padStart(3, "0")}.jpg`;
     }
 
     function makeCardDisplayName(index) {
+      const baseName = getCardBaseName();
       if (state.result && ["multiple", "multipleDoble", "multipleDoblePlus"].includes(state.result.mode)) {
         const groupSize = state.result.groupSize || Number(els.multipleCount.value) || 4;
         const groupIndex = Math.floor(index / groupSize) + 1;
         const letter = lettersForIndex(index % groupSize);
-        return `Carta ${groupIndex}${letter}`;
+        return `${baseName}${groupIndex}${letter}`;
       }
-      return `Carta ${index + 1}`;
+      return `${baseName}${index + 1}`;
+    }
+
+    function getCardBaseName() {
+      return els.cardNameGallery.value.trim() || "Carta";
+    }
+
+    function safeFilenamePart(value) {
+      return String(value).replace(/[<>:"/\\|?*\u0000-\u001F]/g, "_").replace(/[. ]+$/g, "") || "Carta";
+    }
+
+    function syncCardName(source) {
+      const value = source.value;
+      if (source !== els.cardNameGallery) els.cardNameGallery.value = value;
+      if (source !== els.cardNameExport) els.cardNameExport.value = value;
+      if (!state.result) return;
+
+      els.previewGrid.querySelectorAll(".gallery-card").forEach((card) => {
+        const index = Number(card.dataset.cardIndex);
+        const title = card.querySelector(".gallery-card-title");
+        if (title) title.textContent = makeCardDisplayName(index);
+      });
+
+      const card = state.result.cards[state.currentIndex];
+      els.currentSummary.textContent = `${makeCardDisplayName(state.currentIndex)}: ${card.map(formatCardValue).join(", ")}`;
+      els.exportStatus.textContent = `Los archivos se exportarán como ${makeCardDisplayName(0)}.jpg, ${makeCardDisplayName(1)}.jpg…`;
     }
 
     function lettersForIndex(index) {
