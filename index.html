@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>PERCAL JS</title>
 
+  <link rel="icon" href="data:," />
   <link rel="stylesheet" href="./styles.css" />
 
   <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
@@ -89,12 +90,10 @@
           </div>
 
           <div class="field">
-            <label for="imageExtension">Extensión fotos fuente</label>
-            <select id="imageExtension">
-              <option value="jpg">.jpg</option>
-              <option value="png">.png</option>
-              <option value="webp">.webp</option>
-            </select>
+            <label>Formato de imágenes incluidas</label>
+            <input id="imageExtension" type="hidden" value="jpg" />
+            <div class="readonly-value">JPG — detectado automáticamente</div>
+            <small>Las fotos personalizadas pueden seguir siendo JPG, PNG o WebP.</small>
           </div>
 
           <div class="field full-span custom-upload-panel">
@@ -1620,7 +1619,9 @@
       if (custom) return custom.url;
 
       const requestedSize = els.sizeId.value === "custom" || els.sizeId.value === "7" ? 6 : sizeId;
-      return defaultImageUrl(imageId, requestedSize, els.imageExtension.value);
+      // Las colecciones incluidas en el repositorio son JPG. No se usa el
+      // formato de una exportación o carga personalizada para construir su ruta.
+      return defaultImageUrl(imageId, requestedSize, "jpg");
     }
 
     function getSourceSizeId() {

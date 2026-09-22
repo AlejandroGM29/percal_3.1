@@ -21,8 +21,14 @@
   box-sizing: border-box;
 }
 
+html {
+  min-height: 100%;
+  background: var(--bg);
+}
+
 body {
   margin: 0;
+  min-height: 100vh;
   padding: 24px;
   background: var(--bg);
 }
@@ -586,6 +592,16 @@ textarea {
   font-family: inherit;
 }
 
+.readonly-value {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  padding: 11px 12px;
+  background: var(--soft2);
+  color: var(--text);
+  font-size: 14px;
+}
+
 textarea:focus {
   border-color: #111827;
   box-shadow: 0 0 0 3px rgba(17, 24, 39, 0.12);
@@ -690,7 +706,9 @@ textarea:focus {
 }
 
 body {
-  background: radial-gradient(circle at top, #162036 0, var(--bg) 42%);
+  background-color: var(--bg);
+  background-image: radial-gradient(circle at top, #162036 0, var(--bg) 42%);
+  background-repeat: no-repeat;
   color: var(--text);
 }
 
